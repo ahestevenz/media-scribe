@@ -1,0 +1,21 @@
+root_models_path: &root_models_path /Users/ahestevenz/.cache/huggingface/hub
+verbose: false
+device: "mps"
+
+llama_config:
+  model_name: "meta-llama/Meta-Llama-3-8B-Instruct"
+  system_prompt: "You are a helpful assistant"
+  max_num_historical_messages: 6
+  model_size: "8B"                 # Model size is 70B
+  max_tokens: 256                   # Maximum tokens for generation
+  temperature: 0.7                  # Sampling temperature
+  top_p: 0.9                        # Top-p sampling
+
+sd_config:
+  model_type: "sd_xl"               # Using SDXL model
+  model_dir: *root_models_path
+  model_filename: "path/to/llama_70b"   # Path to LLaMA 70B model
+  output_type: "image"              # Generating an image
+  num_frames: 30                    # Number of frames for video (optional)
+  fps: 10                           # FPS for video (optional)
+
