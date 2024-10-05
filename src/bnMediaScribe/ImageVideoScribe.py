@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 from pathlib import Path
 from typing import List
@@ -5,8 +7,8 @@ from typing import List
 import cv2
 import numpy as np
 import torch
-from diffusers import (StableDiffusionXLImg2ImgPipeline,
-                       StableDiffusionXLPipeline)
+from diffusers import StableDiffusionXLImg2ImgPipeline
+from diffusers import StableDiffusionXLPipeline
 from loguru import logger
 from MediaScribeConfig import MediaScribeConfig
 from PIL import Image
@@ -18,8 +20,10 @@ class ImageVideoScribe:
         self.root_ouput_path = self.config.root_ouput_path
         self.config = config.sd_config
         self.device = torch.device(config.device)
-        self.base_model_pipe = StableDiffusionXLPipeline.from_pretrained(self.config.base_model_path).to(self.device)
-        self.refiner_model_pipe = StableDiffusionXLImg2ImgPipeline.from_pretrained(self.config.refiner_model_path).to(self.device)
+        self.base_model_pipe = StableDiffusionXLPipeline.from_pretrained(
+            self.config.base_model_path).to(self.device)
+        self.refiner_model_pipe = StableDiffusionXLImg2ImgPipeline.from_pretrained(
+            self.config.refiner_model_path).to(self.device)
 
     ###############
 
@@ -78,25 +82,27 @@ class ImageVideoScribe:
     # refined_image.save(os.path.join(directory, f"refined_{image_filename}"))
 
     ##############
-    def generate_image(self, prompt: str)->Path:
-        if self.device.type == "cuda":
-            with torch.autocast("cuda"):
+    def generate_image(self, prompt: str) -> Path:
+        if self.device.type == 'cuda':
+            with torch.autocast('cuda'):
                 base_image = self.base_model_pipe(prompt).images[0]
         else:
             base_image = self.base_model_pipe(prompt).images[0]
 
         if self.verbose:
             logger.
-            base_image.save(os.path.join(directory, f"base_{image_filename}"))
+            base_image.save(os.path.join(directory, f'base_{image_filename}'))
 
         # Refine the initial image using the refiner model
-        if self.device.type == "cuda":
-            with torch.autocast("cuda"):
+        if self.device.type == 'cuda':
+            with torch.autocast('cuda'):
                 # Refine the base image using the pipeline (CUDA case)
-                refined_image = self.refiner_model_pipe(prompt=prompt, image=base_image).images[0]
+                refined_image = self.refiner_model_pipe(
+                    prompt=prompt, image=base_image).images[0]
         else:
             # If not using CUDA, don't use autocast
-            refined_image = self.refiner_model_pipe(prompt=prompt, image=base_image).images[0]
+            refined_image = self.refiner_model_pipe(
+                prompt=prompt, image=base_image).images[0]
 
         return refined_image
 

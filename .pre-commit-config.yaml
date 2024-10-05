@@ -1,11 +1,14 @@
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.4.0
+    rev: v4.6.0
     hooks:
       - id: trailing-whitespace
       - id: end-of-file-fixer
       - id: check-yaml
-      - id: check-added-large-files
+      - id: debug-statements
+      - id: double-quote-string-fixer
+      - id: name-tests-test
+      - id: requirements-txt-fixer
 
   - repo: https://github.com/psf/black
     rev: 23.1.0
@@ -13,23 +16,42 @@ repos:
       - id: black
         language_version: python3
 
+  - repo: https://github.com/asottile/setup-cfg-fmt
+    rev: v2.5.0
+    hooks:
+      - id: setup-cfg-fmt
+
+  - repo: https://github.com/asottile/reorder-python-imports
+    rev: v3.13.0
+    hooks:
+      - id: reorder-python-imports
+        exclude: ^(pre_commit/resources/|testing/resources/python3_hooks_repo/)
+        args: [--py39-plus, --add-import, 'from __future__ import annotations']
+
+  - repo: https://github.com/asottile/add-trailing-comma
+    rev: v3.1.0
+    hooks:
+      - id: add-trailing-comma
+
+  - repo: https://github.com/asottile/pyupgrade
+    rev: v3.17.0
+    hooks:
+      - id: pyupgrade
+        args: [--py39-plus]
+
+  - repo: https://github.com/hhatto/autopep8
+    rev: v2.3.1
+    hooks:
+      - id: autopep8
+
   - repo: https://github.com/PyCQA/flake8
-    rev: cf1542cefa3e766670b2066dd75c4571d682a649
+    rev: 7.1.1
     hooks:
       - id: flake8
-        additional_dependencies: [flake8-docstrings]
-
-  - repo: https://github.com/pre-commit/mirrors-isort
-    rev: v5.10.1
-    hooks:
-      - id: isort
 
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.5.0
+    rev: v1.11.2
     hooks:
       - id: mypy
-
-  - repo: https://github.com/PyCQA/bandit
-    rev: 1.7.4
-    hooks:
-      - id: bandit
+        additional_dependencies: [types-pyyaml]
+        exclude: ^testing/resources/

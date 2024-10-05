@@ -1,9 +1,13 @@
+from __future__ import annotations
+
 from enum import Enum
 from pathlib import Path
 
 import torch
 import yaml
-from pydantic import BaseModel, FieldValidationInfo, field_validator
+from pydantic import BaseModel
+from pydantic import field_validator
+from pydantic import FieldValidationInfo
 
 
 class ModelType(str, Enum):
@@ -40,7 +44,8 @@ class LlamaModelScribeConfig(BaseModel):
     @field_validator("max_num_historical_messages", mode="before")
     def check_history_limit(cls, value):
         if value <= 0:
-            raise ValueError("max_num_historical_messages must be a positive integer")
+            raise ValueError(
+                "max_num_historical_messages must be a positive integer")
         return value
 
     @property
@@ -105,9 +110,11 @@ class MediaScribeConfig(BaseModel):
         if v not in ["cpu", "cuda", "mps"]:
             raise ValueError("Device must be either 'cpu', 'cuda', or 'mps'")
         if v == "cuda" and not torch.cuda.is_available():
-            raise ValueError("CUDA is not available on this machine, please use 'cpu'")
+            raise ValueError(
+                "CUDA is not available on this machine, please use 'cpu'")
         if v == "mps" and not torch.backends.mps.is_available():
-            raise ValueError("MPS is not available on this machine, please use 'cpu'")
+            raise ValueError(
+                "MPS is not available on this machine, please use 'cpu'")
         return v
 
     def get_model_path(self):
@@ -124,7 +131,7 @@ class MediaScribeConfig(BaseModel):
     @classmethod
     def from_yaml(cls, file_path: str):
         """Load the configuration from a YAML file."""
-        with open(file_path, "r") as file:
+        with open(file_path) as file:
             config_data = yaml.safe_load(file)
 
         return cls(**config_data)

@@ -1,13 +1,18 @@
-from pathlib import Path
-from typing import Dict, List, String, Tuple
+from __future__ import annotations
 
-from loguru import logger as logging
+from pathlib import Path
+from typing import Dict
+from typing import List
+from typing import String
+from typing import Tuple
 
 from bnMediaScribe import LlamaTextScribe as llama
+from loguru import logger as logging
 
 
 def start_text_interation(
-    llama_model: llama.LlamaTextScribe, generate_image: bool = True
+    llama_model: llama.LlamaTextScribe,
+    generate_image: bool = True,
 ) -> String:
     if generate_image:
         logging.info("Introduce your prompt to generate the image:")
@@ -27,7 +32,7 @@ def start_text_interation(
     elif response == "yes":
         logging.info("Welcome to the LLaMA 3 Interactive Text Generator!")
         logging.info(
-            "Type 'exit' to quit the program and use the last LLaMA response as the prompt.\n"
+            "Type 'exit' to quit the program and use the last LLaMA response as the prompt.\n",
         )
 
         last_llama_response = ""
