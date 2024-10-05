@@ -1,1 +1,1 @@
-__all__ = ['run_scribe_text']
+__all__ = ["run_scribe_text"]

@@ -1,13 +1,16 @@
+import os
 from pathlib import Path
 from typing import List
-from loguru import logger
-from diffusers import StableDiffusionXLPipeline, StableDiffusionXLImg2ImgPipeline
-import numpy as np
-from PIL import Image
-from MediaScribeConfig import MediaScribeConfig
-import torch
+
 import cv2
-import os    
+import numpy as np
+import torch
+from diffusers import (StableDiffusionXLImg2ImgPipeline,
+                       StableDiffusionXLPipeline)
+from loguru import logger
+from MediaScribeConfig import MediaScribeConfig
+from PIL import Image
+
 
 class ImageVideoScribe:
     def __init__(self, config: MediaScribeConfig):
@@ -17,9 +20,9 @@ class ImageVideoScribe:
         self.device = torch.device(config.device)
         self.base_model_pipe = StableDiffusionXLPipeline.from_pretrained(self.config.base_model_path).to(self.device)
         self.refiner_model_pipe = StableDiffusionXLImg2ImgPipeline.from_pretrained(self.config.refiner_model_path).to(self.device)
-    
+
     ###############
-    
+
     # import os, uuid
     # import torch
     # from diffusers import StableDiffusionXLPipeline, StableDiffusionXLImg2ImgPipeline
@@ -73,7 +76,7 @@ class ImageVideoScribe:
 
     # # Save the refined image
     # refined_image.save(os.path.join(directory, f"refined_{image_filename}"))
-    
+
     ##############
     def generate_image(self, prompt: str)->Path:
         if self.device.type == "cuda":
@@ -81,11 +84,11 @@ class ImageVideoScribe:
                 base_image = self.base_model_pipe(prompt).images[0]
         else:
             base_image = self.base_model_pipe(prompt).images[0]
-            
+
         if self.verbose:
             logger.
             base_image.save(os.path.join(directory, f"base_{image_filename}"))
-        
+
         # Refine the initial image using the refiner model
         if self.device.type == "cuda":
             with torch.autocast("cuda"):
@@ -96,9 +99,9 @@ class ImageVideoScribe:
             refined_image = self.refiner_model_pipe(prompt=prompt, image=base_image).images[0]
 
         return refined_image
-    
+
     # def generate_video(self, prompts: List[str]):
-        
+
     #     frames = []
     #     fps = 23 # TODO: Get it from config
     #     frame_count = len(prompts)
@@ -133,5 +136,5 @@ class ImageVideoScribe:
 
     #     # Release the video writer
     #     video.release()
-        
+
     #     print(f"Video saved at {video_path}")

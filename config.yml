@@ -18,4 +18,3 @@ sd_config:
   output_type: "image"              # Generating an image
   num_frames: 30                    # Number of frames for video (optional)
   fps: 10                           # FPS for video (optional)
-
