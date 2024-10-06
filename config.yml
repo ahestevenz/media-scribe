@@ -5,14 +5,21 @@ llama_config:
   model_name: "meta-llama/Meta-Llama-3-8B-Instruct"
   system_prompt: "You are a helpful assistant"
   max_num_historical_messages: 6
-  model_size: "8B"                 # Model size is 70B
-  max_tokens: 256                   # Maximum tokens for generation
-  temperature: 0.7                  # Sampling temperature
-  top_p: 0.9                        # Top-p sampling
+  max_tokens: 256
+  temperature: 0.7
+  top_p: 0.9
 
 sd_config:
-  root_models_path: &root_models_path /Users/ahestevenz/.cache/huggingface/hub
+  root_models_path: /Users/ahestevenz/.cache/huggingface/hub
   root_output_dir: /Users/ahestevenz/Desktop/hola
-  model_type: "civitai"               # Using SDXL model
-  num_frames: 30                    # Number of frames for video (optional)
-  fps: 10                           # FPS for video (optional)
+  model_type: "civitai"
+  model_paths:
+    sd_3:
+      - models--stabilityai--stable-diffusion-3-medium-diffusers/snapshots/ea42f8cef0f178587cf766dc8129abd379c90671/
+      - models--Stable-Diffusion-XL/sd_xl_refiner_1.0.safetensors
+    sd_xl:
+      - models--Stable-Diffusion-XL/sd_xl_base_1.0.safetensors
+      - models--Stable-Diffusion-XL/sd_xl_refiner_1.0.safetensors
+    civitai:
+      - models--civitai/juggernautXL_juggXIByRundiffusion.safetensors
+      - models--Stable-Diffusion-XL/sd_xl_refiner_1.0.safetensors

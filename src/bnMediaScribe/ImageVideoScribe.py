@@ -9,8 +9,9 @@ import torch
 from bnMediaScribe import MediaScribeConfig
 from diffusers import StableDiffusionXLImg2ImgPipeline
 from diffusers import StableDiffusionXLPipeline
-# from loguru import logger
 from transformers import CLIPTokenizer
+
+# from loguru import logger
 
 
 class ImageVideoScribe:

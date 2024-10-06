@@ -3,7 +3,6 @@ from __future__ import annotations
 
 from enum import Enum
 from pathlib import Path
-from typing import ClassVar
 from typing import Dict
 from typing import List
 
@@ -77,44 +76,23 @@ class LlamaModelScribeConfig(BaseModel):
 
 
 class StableDiffusionScribeConfig(BaseModel):
-    model_type: ModelImageType = (
-        ModelImageType.CIVITAI
-    )  # Choose between SD 1.5, SDXL, or CivitAI
+    model_type: ModelImageType = ModelImageType.CIVITAI
+    model_paths: Dict[ModelImageType, List[Path]]
     load_refiner: bool = True
     num_inference_steps: int = 50
     guidance_scale: float = 0.7
     root_models_path: Path
     root_output_dir: Path
 
-    # A dictionary mapping model types to their respective model paths
-    model_paths: ClassVar[Dict[ModelImageType, List[Path]]] = {
-        ModelImageType.SD_3: [
-            Path(
-                "models--stabilityai--stable-diffusion-3-medium-diffusers/snapshots/ea42f8cef0f178587cf766dc8129abd379c90671/"
-            ),
-            Path("models--Stable-Diffusion-XL/sd_xl_refiner_1.0.safetensors"),
-        ],
-        ModelImageType.SD_XL: [
-            Path("models--Stable-Diffusion-XL/sd_xl_base_1.0.safetensors"),
-            Path("models--Stable-Diffusion-XL/sd_xl_refiner_1.0.safetensors"),
-        ],
-        ModelImageType.CIVITAI: [
-            Path(
-                "models--civitai/juggernautXL_juggXIByRundiffusion.safetensors"
-            ),
-            Path("models--Stable-Diffusion-XL/sd_xl_refiner_1.0.safetensors"),
-        ],
-    }
-
     @property
     def base_model_path(self):
         """Return the model path based on the selected model_type."""
-        return self.root_models_path / self.model_paths[self.model_type][0]
+        return self.model_paths[self.model_type][0]
 
     @property
     def refiner_model_path(self):
         """Set model_dir based on the model_type."""
-        return self.root_models_path / self.model_paths[self.model_type][1]
+        return self.model_paths[self.model_type][1]
 
     class Config:
         protected_namespaces = ()
@@ -145,7 +123,28 @@ class MediaScribeConfig(BaseModel):
         """Load the configuration from a YAML file."""
         with open(file_path) as file:
             config_data = yaml.safe_load(file)
-        return cls(**config_data)
+
+        llama_config_data = config_data["llama_config"]
+        sd_config_data = config_data["sd_config"]
+
+        model_paths = {
+            ModelImageType(k): [
+                sd_config_data["root_models_path"] / Path(p) for p in v
+            ]
+            for k, v in sd_config_data.pop("model_paths").items()
+        }
+
+        llama_config = LlamaModelScribeConfig(**llama_config_data)
+        sd_config = StableDiffusionScribeConfig(
+            **sd_config_data, model_paths=model_paths
+        )
+
+        return cls(
+            llama_config=llama_config,
+            sd_config=sd_config,
+            device=config_data["device"],
+            verbose=config_data.get("verbose", False),
+        )
 
     def _convert_to_serializable(self, obj):
         if isinstance(obj, Path):
