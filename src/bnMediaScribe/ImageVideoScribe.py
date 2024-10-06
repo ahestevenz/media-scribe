@@ -1,111 +1,154 @@
+# -*- coding: utf-8 -*-
 from __future__ import annotations
 
-import os
+from datetime import datetime
 from pathlib import Path
 from typing import List
 
-import cv2
-import numpy as np
 import torch
+from bnMediaScribe import MediaScribeConfig
 from diffusers import StableDiffusionXLImg2ImgPipeline
 from diffusers import StableDiffusionXLPipeline
-from loguru import logger
-from MediaScribeConfig import MediaScribeConfig
-from PIL import Image
+# from loguru import logger
+from transformers import CLIPTokenizer
 
 
 class ImageVideoScribe:
-    def __init__(self, config: MediaScribeConfig):
+    def __init__(self, config: MediaScribeConfig.MediaScribeConfig):
+        self.config = config
         self.verbose = config.verbose
-        self.root_ouput_path = self.config.root_ouput_path
-        self.config = config.sd_config
+        self.generated_directory = self._generate_directory()
         self.device = torch.device(config.device)
-        self.base_model_pipe = StableDiffusionXLPipeline.from_pretrained(
-            self.config.base_model_path).to(self.device)
-        self.refiner_model_pipe = StableDiffusionXLImg2ImgPipeline.from_pretrained(
-            self.config.refiner_model_path).to(self.device)
+        self._load_model_pipelines()
 
-    ###############
+    def _generate_directory(
+        self,
+    ) -> Path:
+        current_datetime = datetime.now()
+        directory = (
+            self.config.sd_config.root_output_dir
+            / f"{current_datetime.strftime('%Y%m%d_%H%M%S')}_{self.config.sd_config.model_type}"
+        )
+        directory.mkdir(parents=True, exist_ok=True)
+        return directory
 
-    # import os, uuid
-    # import torch
-    # from diffusers import StableDiffusionXLPipeline, StableDiffusionXLImg2ImgPipeline
+    def _load_model_pipelines(
+        self,
+    ):
+        match self.config.sd_config.model_type:
+            case (
+                MediaScribeConfig.ModelImageType.CIVITAI
+                | MediaScribeConfig.ModelImageType.CIVITAI_TEST
+                | MediaScribeConfig.ModelImageType.SD_XL
+            ):
+                self.base_model_pipe = (
+                    StableDiffusionXLPipeline.from_single_file(
+                        self.config.sd_config.base_model_path,
+                        torch_dtype=torch.float16,
+                    ).to(self.device)
+                )
+                pass
+            case MediaScribeConfig.ModelImageType.SD_3:
+                self.base_model_pipe = (
+                    StableDiffusionXLPipeline.from_pretrained(
+                        self.config.sd_config.base_model_path,
+                        torch_dtype=torch.float16,
+                    ).to(self.device)
+                )
+                pass
+            case _:
+                raise NotImplementedError("Method does not exist!")
 
-    # root_model_path = "/Users/ahestevenz/.cache/huggingface/hub/models--Stable-Diffusion-XL"
-    # image_filename = f"{uuid.uuid4()}.png"
-    # directory = "/Users/ahestevenz/testing_llm/SDXL"
-    # if not os.path.exists(directory):
-    #     os.makedirs(directory)
+        if self.config.sd_config.load_refiner:
+            self.refiner_model_pipe = (
+                StableDiffusionXLImg2ImgPipeline.from_single_file(
+                    self.config.sd_config.refiner_model_path,
+                    torch_dtype=torch.float16,
+                ).to(self.device)
+            )
 
-    # # Path to the CivitAI checkpoint model (downloaded from CivitAI)
-    # civitai_checkpoint_path = "/Users/ahestevenz/Desktop/juggernautXL_juggXIByRundiffusion.safetensors"
+    def _truncate_prompt(self, prompt: str) -> str:
+        tokenizer = CLIPTokenizer.from_pretrained(
+            "openai/clip-vit-large-patch14"
+        )
+        tokens = tokenizer(
+            prompt, truncation=True, max_length=77, return_tensors="pt"
+        )
+        return tokenizer.decode(
+            tokens["input_ids"][0], skip_special_tokens=True
+        )
 
-    # # Load the CivitAI checkpoint as the base model pipeline
-    # pipe = StableDiffusionXLPipeline.from_single_file(civitai_checkpoint_path, torch_dtype=torch.float16)
+    def _split_prompt(self, prompt: str, max_tokens: int = 77) -> List[str]:
+        tokenizer = CLIPTokenizer.from_pretrained(
+            "openai/clip-vit-base-patch32"
+        )
+        tokens = tokenizer.encode(prompt, add_special_tokens=False)
+        if len(tokens) <= max_tokens:
+            return [prompt]
+        words = prompt.split()
+        chunk_1 = []
+        chunk_2 = []
+        current_tokens = 0
+        for word in words:
+            word_tokens = tokenizer.encode(word, add_special_tokens=False)
+            if current_tokens + len(word_tokens) > max_tokens:
+                chunk_2.append(word)
+            else:
+                chunk_1.append(word)
+                current_tokens += len(word_tokens)
+        return [" ".join(chunk_1), " ".join(chunk_2)]
 
-    # # Move the model to the appropriate device
-    # device = torch.device("mps" if torch.backends.mps.is_available() else "cuda" if torch.cuda.is_available() else "cpu")
-    # pipe.to(device)
-
-    # # Generate an initial image from a prompt
-    # prompt = "Create a 1280x720 image of a mystical red planet with glowing landscapes, floating islands, and swirling auroras. Unicorns with radiant horns gallop across crimson plains, while flying foxes with shimmering wings glide between crystal formations. Magical stardust sparkles as twin moons cast an ethereal glow."
-    # if device.type == "cuda":
-    #     with torch.autocast("cuda"):
-    #         # Generate the base image using the pipeline (CUDA case)
-    #         base_image = pipe(prompt).images[0]
-    # else:
-    #     # If not using CUDA, don't use autocast
-    #     base_image = pipe(prompt).images[0]
-
-    # # Save the initial image
-    # base_image.save(os.path.join(directory, f"base_{image_filename}"))
-
-    # # Optionally, refine the image using a refiner model
-    # refiner_model_path = f"{root_model_path}/sd_xl_refiner_1.0.safetensors"
-
-    # # Load the refiner model
-    # refiner_pipe = StableDiffusionXLImg2ImgPipeline.from_single_file(refiner_model_path, torch_dtype=torch.float16)
-
-    # # Move the refiner to the appropriate device
-    # refiner_pipe.to(device)
-
-    # # Refine the initial image using the refiner model
-    # if device.type == "cuda":
-    #     with torch.autocast("cuda"):
-    #         # Refine the base image using the pipeline (CUDA case)
-    #         refined_image = refiner_pipe(prompt=prompt, image=base_image).images[0]
-    # else:
-    #     # If not using CUDA, don't use autocast
-    #     refined_image = refiner_pipe(prompt=prompt, image=base_image).images[0]
-
-    # # Save the refined image
-    # refined_image.save(os.path.join(directory, f"refined_{image_filename}"))
-
-    ##############
-    def generate_image(self, prompt: str) -> Path:
-        if self.device.type == 'cuda':
-            with torch.autocast('cuda'):
-                base_image = self.base_model_pipe(prompt).images[0]
+    def generate_image(self, prompt: str, negative_prompt: str = "") -> Path:
+        filename = "generated_image"
+        prompt = self._truncate_prompt(prompt)
+        if self.device.type == "cuda":
+            with torch.autocast("cuda"):
+                base_image = self.base_model_pipe(
+                    prompt,
+                    negative_prompt=negative_prompt,
+                    num_inference_steps=self.config.sd_config.num_inference_steps,
+                    guidance_scale=self.config.sd_config.guidance_scale,
+                ).images[0]
         else:
-            base_image = self.base_model_pipe(prompt).images[0]
+            base_image = self.base_model_pipe(
+                prompt,
+                negative_prompt=negative_prompt,
+                num_inference_steps=self.config.sd_config.num_inference_steps,
+                guidance_scale=self.config.sd_config.guidance_scale,
+            ).images[0]
+
+        image_path: Path = self.generated_directory / f"base_{filename}.png"
 
         if self.verbose:
-            logger.
-            base_image.save(os.path.join(directory, f'base_{image_filename}'))
+            base_image.save(image_path)
 
-        # Refine the initial image using the refiner model
-        if self.device.type == 'cuda':
-            with torch.autocast('cuda'):
-                # Refine the base image using the pipeline (CUDA case)
+        if self.config.sd_config.load_refiner:
+            if self.device.type == "cuda":
+                with torch.autocast("cuda"):
+                    refined_image = self.refiner_model_pipe(
+                        prompt,
+                        image=base_image,
+                        negative_prompt=negative_prompt,
+                        num_inference_steps=self.config.sd_config.num_inference_steps,
+                        guidance_scale=self.config.sd_config.guidance_scale,
+                    ).images[0]
+            else:
                 refined_image = self.refiner_model_pipe(
-                    prompt=prompt, image=base_image).images[0]
+                    prompt,
+                    image=base_image,
+                    negative_prompt=negative_prompt,
+                    num_inference_steps=self.config.sd_config.num_inference_steps,
+                    guidance_scale=self.config.sd_config.guidance_scale,
+                ).images[0]
+
+            image_path = self.generated_directory / f"refined_{filename}.png"
+            refined_image.save(image_path)
         else:
-            # If not using CUDA, don't use autocast
-            refined_image = self.refiner_model_pipe(
-                prompt=prompt, image=base_image).images[0]
+            base_image.save(image_path)
+        self.config.to_yaml(self.generated_directory / "config.yml")
+        return image_path
 
-        return refined_image
-
+    # TODO: generate video once image generation workflow is done
     # def generate_video(self, prompts: List[str]):
 
     #     frames = []

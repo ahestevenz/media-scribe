@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """Command line script to upload a whole directory tree."""
 from __future__ import annotations
 
@@ -32,7 +33,8 @@ def _main(args):
         return -1
 
     media_config = MediaScribeConfig.MediaScribeConfig.from_yaml(
-        Path(args["conf"]))
+        Path(args["conf"]),
+    )
     llama_model = LlamaTextScribe.LlamaTextScribe(media_config)
     _ = utils.start_text_interation(llama_model, generate_image=False)
     return 0
@@ -77,8 +79,12 @@ def main():
     if args["profile"] is not None:
         logger.info("Start profiling")
         r = 1
-        profile.runctx("r = _main(args)", globals(),
-                       locals(), filename=args["profile"])
+        profile.runctx(
+            "r = _main(args)",
+            globals(),
+            locals(),
+            filename=args["profile"],
+        )
         logger.info("Done profiling")
     else:
         logger.info("Running without profiling")

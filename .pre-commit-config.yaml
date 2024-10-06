@@ -1,43 +1,35 @@
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.6.0
+    rev: v5.0.0
     hooks:
-      - id: trailing-whitespace
-      - id: end-of-file-fixer
-      - id: check-yaml
-      - id: debug-statements
-      - id: double-quote-string-fixer
-      - id: name-tests-test
-      - id: requirements-txt-fixer
+      -   id: check-added-large-files
+      -   id: check-ast
+      -   id: check-case-conflict
+      -   id: check-docstring-first
+      -   id: check-json
+      -   id: check-merge-conflict
+      -   id: check-toml
+      -   id: check-xml
+      -   id: check-yaml
+      -   id: debug-statements
+      -   id: end-of-file-fixer
+      -   id: fix-encoding-pragma
+      -   id: name-tests-test
+      -   id: trailing-whitespace
 
   - repo: https://github.com/psf/black
-    rev: 23.1.0
+    rev: 24.8.0
     hooks:
       - id: black
         language_version: python3
-
-  - repo: https://github.com/asottile/setup-cfg-fmt
-    rev: v2.5.0
-    hooks:
-      - id: setup-cfg-fmt
+        args: ["--line-length=79"]
 
   - repo: https://github.com/asottile/reorder-python-imports
     rev: v3.13.0
     hooks:
       - id: reorder-python-imports
         exclude: ^(pre_commit/resources/|testing/resources/python3_hooks_repo/)
-        args: [--py39-plus, --add-import, 'from __future__ import annotations']
-
-  - repo: https://github.com/asottile/add-trailing-comma
-    rev: v3.1.0
-    hooks:
-      - id: add-trailing-comma
-
-  - repo: https://github.com/asottile/pyupgrade
-    rev: v3.17.0
-    hooks:
-      - id: pyupgrade
-        args: [--py39-plus]
+        # args: [--py39-plus, --add-import, 'from __future__ import annotations']
 
   - repo: https://github.com/hhatto/autopep8
     rev: v2.3.1
@@ -48,10 +40,10 @@ repos:
     rev: 7.1.1
     hooks:
       - id: flake8
+        language_version: python3
 
   - repo: https://github.com/pre-commit/mirrors-mypy
     rev: v1.11.2
     hooks:
       - id: mypy
         additional_dependencies: [types-pyyaml]
-        exclude: ^testing/resources/

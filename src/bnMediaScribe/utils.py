@@ -1,37 +1,39 @@
+# -*- coding: utf-8 -*-
 from __future__ import annotations
 
 from pathlib import Path
 from typing import Dict
 from typing import List
-from typing import String
 from typing import Tuple
 
 from bnMediaScribe import LlamaTextScribe as llama
-from loguru import logger as logging
+from loguru import logger
 
 
 def start_text_interation(
     llama_model: llama.LlamaTextScribe,
     generate_image: bool = True,
-) -> String:
+) -> str:
     if generate_image:
-        logging.info("Introduce your prompt to generate the image:")
+        logger.info("Introduce your prompt to generate the image:")
         print("You: ")
         prompt = input(" ")
 
         response = (
-            input("Do you want to improve the prompt? (yes/no): ").strip().lower()
+            input("Do you want to improve the prompt? (yes/no): ")
+            .strip()
+            .lower()
         )
     else:
         response = "yes"
 
     if response == "no":
-        logging.info("Returning the original prompt...")
+        logger.info("Returning the original prompt...")
         return prompt
 
     elif response == "yes":
-        logging.info("Welcome to the LLaMA 3 Interactive Text Generator!")
-        logging.info(
+        logger.info("Welcome to the LLaMA 3 Interactive Text Generator!")
+        logger.info(
             "Type 'exit' to quit the program and use the last LLaMA response as the prompt.\n",
         )
 
@@ -51,9 +53,9 @@ def start_text_interation(
                 print(f" {generated_text}")
                 last_llama_response = generated_text
             except Exception as e:
-                logging.error(f"Error generating text: {e}")
+                logger.error(f"Error generating text: {e}")
 
         return prompt
     else:
-        logging.warning("Invalid response. Returning the original prompt.")
+        logger.warning("Invalid response. Returning the original prompt.")
         return prompt

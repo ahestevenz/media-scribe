@@ -1,5 +1,4 @@
-root_models_path: &root_models_path /Users/ahestevenz/.cache/huggingface/hub
-verbose: false
+verbose: true
 device: "mps"
 
 llama_config:
@@ -12,9 +11,8 @@ llama_config:
   top_p: 0.9                        # Top-p sampling
 
 sd_config:
-  model_type: "sd_xl"               # Using SDXL model
-  model_dir: *root_models_path
-  model_filename: "path/to/llama_70b"   # Path to LLaMA 70B model
-  output_type: "image"              # Generating an image
+  root_models_path: &root_models_path /Users/ahestevenz/.cache/huggingface/hub
+  root_output_dir: /Users/ahestevenz/Desktop/hola
+  model_type: "civitai"               # Using SDXL model
   num_frames: 30                    # Number of frames for video (optional)
   fps: 10                           # FPS for video (optional)
