@@ -1,11 +1,6 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Dict
-from typing import List
-from typing import Tuple
-
 from bnMediaScribe import LlamaTextScribe as llama
 from loguru import logger
 
@@ -19,11 +14,8 @@ def start_text_interation(
         print("You: ")
         prompt = input(" ")
 
-        response = (
-            input("Do you want to improve the prompt? (yes/no): ")
-            .strip()
-            .lower()
-        )
+        response = input(
+            "Do you want to improve the prompt? (yes/no): ").strip().lower()
     else:
         response = "yes"
 

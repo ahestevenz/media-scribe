@@ -5,6 +5,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Dict
 from typing import List
+from typing import Optional
 
 import torch
 import yaml
@@ -18,6 +19,8 @@ class ModelImageType(str, Enum):
     CIVITAI = "civitai"
     SD_3 = "sd_3"
     SD_XL = "sd_xl"
+    PIX_2_PIX = "pix_2_pix"
+    SD_1_5_IMG_2_IMG = "sd_1_5_img_2_img"
 
 
 class ModelTextType(str, Enum):
@@ -77,7 +80,7 @@ class LlamaModelScribeConfig(BaseModel):
 
 class StableDiffusionScribeConfig(BaseModel):
     model_type: ModelImageType = ModelImageType.CIVITAI
-    model_paths: Dict[ModelImageType, List[Path]]
+    model_paths: Dict[ModelImageType, List[Optional[Path]]]
     load_refiner: bool = True
     num_inference_steps: int = 50
     guidance_scale: float = 0.7
@@ -129,15 +132,14 @@ class MediaScribeConfig(BaseModel):
 
         model_paths = {
             ModelImageType(k): [
-                sd_config_data["root_models_path"] / Path(p) for p in v
+                sd_config_data["root_models_path"] / Path(p) if p else None for p in v
             ]
             for k, v in sd_config_data.pop("model_paths").items()
         }
 
         llama_config = LlamaModelScribeConfig(**llama_config_data)
         sd_config = StableDiffusionScribeConfig(
-            **sd_config_data, model_paths=model_paths
-        )
+            **sd_config_data, model_paths=model_paths)
 
         return cls(
             llama_config=llama_config,
@@ -152,9 +154,7 @@ class MediaScribeConfig(BaseModel):
         if isinstance(obj, Enum):
             return obj.value
         if isinstance(obj, dict):
-            return {
-                k: self._convert_to_serializable(v) for k, v in obj.items()
-            }
+            return {k: self._convert_to_serializable(v) for k, v in obj.items()}
         if isinstance(obj, list):
             return [self._convert_to_serializable(v) for v in obj]
         return obj

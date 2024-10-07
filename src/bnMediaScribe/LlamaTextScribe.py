@@ -37,21 +37,16 @@ class LlamaTextScribe:
     def _build_prompt(self):
         """Builds a complete prompt for LLaMA by concatenating all messages."""
         return "\n".join(
-            [
-                f"{msg['role'].capitalize()}: {msg['content']}"
-                for msg in self.messages
-            ],
+            [f"{msg['role'].capitalize()}: {msg['content']}" for msg in self.messages],
         )
 
     def _summarize_chat(self):
         """Build a prompt that instructs the model to summarize the conversation"""
         conversation_text = "\n".join(
-            [
-                f"{msg['role'].capitalize()}: {msg['content']}"
-                for msg in self.messages
-            ],
+            [f"{msg['role'].capitalize()}: {msg['content']}" for msg in self.messages],
         )
-        summary_prompt = f"Please provide a concise summary of the following conversation in two sentences or less:\n{conversation_text}\nSummary:"
+        summary_prompt = f"Please provide a concise summary of the following \
+            conversation in two sentences or less:\n{conversation_text}\nSummary:"
 
         inputs = self.tokenizer(summary_prompt, return_tensors="pt").to(
             self.device,
@@ -65,13 +60,11 @@ class LlamaTextScribe:
 
     def _truncate_if_needed(self, full_prompt: str) -> str:
         """Truncate the conversation history to fit within the token limit, if necessary."""
-        tokenized_prompt = self.tokenizer(full_prompt, return_tensors="pt")[
-            "input_ids"
-        ]
+        tokenized_prompt = self.tokenizer(
+            full_prompt, return_tensors="pt")["input_ids"]
         if tokenized_prompt.shape[1] > self.config.max_input_tokens:
-            truncation_point = (
-                tokenized_prompt.shape[1] - self.config.max_input_tokens
-            )
+            truncation_point = tokenized_prompt.shape[1] - \
+                self.config.max_input_tokens
             truncated_prompt = self.tokenizer.decode(
                 tokenized_prompt[0, truncation_point:],
                 skip_special_tokens=True,
