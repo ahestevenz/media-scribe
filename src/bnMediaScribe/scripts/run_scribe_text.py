@@ -66,7 +66,7 @@ def main():
     argparser.add_argument(
         "-p",
         "--profile",
-        help="Run with profiling and store " "output in given file",
+        help="Run with profiling and store output in given file",
         metavar="output.prof",
     )
     args = vars(argparser.parse_args())

@@ -71,7 +71,6 @@ class ImageVideoScribe:
             case MediaScribeConfig.ModelImageType.SD_1_5_IMG_2_IMG:
                 self.base_model_pipe = StableDiffusionImg2ImgPipeline.from_pretrained(
                     self.config.sd_config.base_model_path,
-                    # "radames/stable-diffusion-v1-5-img2img",
                     torch_dtype=torch.float16,
                 ).to(self.device)
                 self.load_img2img = True

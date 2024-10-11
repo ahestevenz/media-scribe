@@ -23,7 +23,7 @@ setup(
         "Intended Audience :: Developers",
     ],
     keywords="llm image video ai generation",
-    url="https://github.com/ahestevenz/bushfires-object-detection",
+    url="https://github.com/ahestevenz/media-scribe",
     author="Ariel Hernandez <ahestevenz@bleiben.ar>",
     author_email="ahestevenz@bleiben.ar",
     license="Proprietary",
@@ -34,7 +34,9 @@ setup(
     tests_require=["nose"],
     entry_points={
         "console_scripts": [
-            "bn-run-train=bnMediaScribe.scripts.run_scribe:main",
+            "bn-run-scribe-text=bnMediaScribe.scripts.run_scribe_text:main",
+            "bn-run-scribe-image=bnMediaScribe.scripts.run_scribe_image:main",
+            "bn-run-scribe-image2image=bnMediaScribe.scripts.run_scribe_image2image:main",
         ],
     },
     include_package_data=True,
