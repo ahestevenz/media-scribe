@@ -48,8 +48,20 @@ def _main(args):
         "Enter a negative prompt for image generation (leave blank if none):")
     print("Negative Prompt: ")
     negative_prompt = input(" ")
+
     image_model = ImageVideoScribe.ImageVideoScribe(media_config)
-    image_model.generate_image(prompt, negative_prompt)
+    try:
+        if args["path_image"]:
+            strength = float(args["strength"])
+            image_path = Path(args["path_image"])
+            image_model.generate_image_from_image(
+                prompt, image_path, strength, negative_prompt
+            )
+        else:
+            image_model.generate_image(prompt, negative_prompt)
+    except Exception as ex:
+        logger.error(
+            f"An error occurred: {ex.__class__.__name__} - {ex}", exc_info=True)
     return 0
 
 
@@ -66,6 +78,22 @@ def main():
         "--conf",
         help="YAML configuration file",
         required=True,
+    )
+
+    argparser.add_argument(
+        "-i",
+        "--path-image",
+        help="Path to the reference image that will be used as a starting point to generate a new one.",
+        default=None,
+        required=False,
+    )
+
+    argparser.add_argument(
+        "-s",
+        "--strength",
+        help="Strength",
+        default=0.75,
+        required=False,
     )
 
     argparser.add_argument(
