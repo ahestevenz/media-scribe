@@ -7,11 +7,12 @@ from typing import List
 
 import torch
 from bnMediaScribe import MediaScribeConfig
-from diffusers import StableDiffusion3Pipeline
-from diffusers import StableDiffusionImg2ImgPipeline
-from diffusers import StableDiffusionInstructPix2PixPipeline
-from diffusers import StableDiffusionXLImg2ImgPipeline
-from diffusers import StableDiffusionXLPipeline
+from diffusers import (
+    StableDiffusion3Pipeline,
+    StableDiffusionImg2ImgPipeline,
+    StableDiffusionInstructPix2PixPipeline,
+    StableDiffusionXLImg2ImgPipeline,
+    StableDiffusionXLPipeline)
 from PIL import Image
 from transformers import CLIPTokenizer
 

@@ -3,16 +3,14 @@ from __future__ import annotations
 
 from enum import Enum
 from pathlib import Path
-from typing import Dict
-from typing import List
-from typing import Optional
+from typing import Dict, List, Optional
 
 import torch
 import yaml
-from pydantic import BaseModel
-from pydantic import field_validator
-from pydantic import FieldValidationInfo
-
+from pydantic import (
+    BaseModel,
+    field_validator,
+    FieldValidationInfo)
 
 class ModelImageType(str, Enum):
     CIVITAI_TEST = "civitai_test"

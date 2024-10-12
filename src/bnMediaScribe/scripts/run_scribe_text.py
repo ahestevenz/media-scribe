@@ -7,9 +7,9 @@ import cProfile as profile
 import sys
 from pathlib import Path
 
-from bnMediaScribe import LlamaTextScribe
-from bnMediaScribe import MediaScribeConfig
-from bnMediaScribe import utils
+from bnMediaScribe import (
+    MediaScribeConfig,
+    utils)
 from loguru import logger
 from transformers import logging
 
