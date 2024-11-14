@@ -17,13 +17,6 @@ repos:
       -   id: name-tests-test
       -   id: trailing-whitespace
 
-  # - repo: https://github.com/asottile/reorder-python-imports
-  #   rev: v3.13.0
-  #   hooks:
-  #     - id: reorder-python-imports
-  #       exclude: ^(pre_commit/resources/|testing/resources/python3_hooks_repo/)
-  #       # args: [--py39-plus, --add-import, 'from __future__ import annotations']
-
   - repo: https://github.com/hhatto/autopep8
     rev: v2.3.1
     hooks:
