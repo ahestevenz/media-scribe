@@ -12,7 +12,7 @@ llama_config:
 sd_config:
   root_models_path: /Users/ahestevenz/.cache/huggingface/hub
   root_output_dir: /Users/ahestevenz/Desktop/hola
-  model_type: "sd_1_5_img_2_img"
+  model_type: "sd_3"
   model_paths:
     sd_3:
       - models--stabilityai--stable-diffusion-3-medium-diffusers/sd3_medium_incl_clips_t5xxlfp16.safetensors

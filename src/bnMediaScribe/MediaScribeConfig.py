@@ -7,10 +7,8 @@ from typing import Dict, List, Optional
 
 import torch
 import yaml
-from pydantic import (
-    BaseModel,
-    field_validator,
-    FieldValidationInfo)
+from pydantic import BaseModel, FieldValidationInfo, field_validator
+
 
 class ModelImageType(str, Enum):
     CIVITAI_TEST = "civitai_test"

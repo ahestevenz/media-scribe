@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
-from bnMediaScribe import LlamaTextScribe as llama
 from loguru import logger
+
+from bnMediaScribe import LlamaTextScribe as llama
 
 
 def start_text_interation(

@@ -17,13 +17,6 @@ repos:
       -   id: name-tests-test
       -   id: trailing-whitespace
 
-  - repo: https://github.com/psf/black
-    rev: 24.8.0
-    hooks:
-      - id: black
-        language_version: python3
-        args: ["--line-length=90"]
-
   - repo: https://github.com/asottile/reorder-python-imports
     rev: v3.13.0
     hooks:
@@ -48,3 +41,9 @@ repos:
     hooks:
       - id: mypy
         additional_dependencies: [types-pyyaml]
+
+  - repo: https://github.com/PyCQA/isort
+    rev: 5.13.2  # Use the latest stable version of isort
+    hooks:
+      - id: isort
+        args: ["--profile=black"]

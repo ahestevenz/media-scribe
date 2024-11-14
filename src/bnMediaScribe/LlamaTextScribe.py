@@ -2,8 +2,10 @@
 from __future__ import annotations
 
 import torch
-from bnMediaScribe import MediaScribeConfig as config
 from transformers import AutoTokenizer, LlamaForCausalLM
+
+from bnMediaScribe import MediaScribeConfig as config
+
 
 class LlamaTextScribe:
     def __init__(self, config: config.MediaScribeConfig):

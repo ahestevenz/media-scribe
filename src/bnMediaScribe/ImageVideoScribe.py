@@ -6,15 +6,17 @@ from pathlib import Path
 from typing import List
 
 import torch
-from bnMediaScribe import MediaScribeConfig
 from diffusers import (
     StableDiffusion3Pipeline,
     StableDiffusionImg2ImgPipeline,
     StableDiffusionInstructPix2PixPipeline,
     StableDiffusionXLImg2ImgPipeline,
-    StableDiffusionXLPipeline)
+    StableDiffusionXLPipeline,
+)
 from PIL import Image
 from transformers import CLIPTokenizer
+
+from bnMediaScribe import MediaScribeConfig
 
 # from loguru import logger
 
