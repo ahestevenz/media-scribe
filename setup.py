@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
-from setuptools import find_packages, setup
+from setuptools import find_packages
+from setuptools import setup
+
 
 def readme():
     with open("README.md") as f:
@@ -37,6 +39,7 @@ setup(
         "pre_commit==4.0.0",
         "loguru==0.7.2",
         "accelerate==1.0.0",
+        "protobuf==5.28.3",
     ],
     test_suite="nose.collector",
     tests_require=["nose"],
