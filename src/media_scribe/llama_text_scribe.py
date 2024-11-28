@@ -4,11 +4,11 @@ from __future__ import annotations
 import torch
 from transformers import AutoTokenizer, LlamaForCausalLM
 
-from bnMediaScribe import MediaScribeConfig as config
+from media_scribe.media_scribe_config import MediaScribeConfig
 
 
 class LlamaTextScribe:
-    def __init__(self, config: config.MediaScribeConfig):
+    def __init__(self, config: MediaScribeConfig):
         self.verbose = config.verbose
         self.config = config.llama_config
         self.device = torch.device(config.device)

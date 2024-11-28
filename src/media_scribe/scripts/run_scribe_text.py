@@ -10,7 +10,9 @@ from pathlib import Path
 from loguru import logger
 from transformers import logging
 
-from bnMediaScribe import ImageVideoScribe, LlamaTextScribe, MediaScribeConfig, utils
+import media_scribe.utils as utils
+from media_scribe.llama_text_scribe import LlamaTextScribe
+from media_scribe.media_scribe_config import MediaScribeConfig
 
 logging.set_verbosity_error()
 
@@ -34,32 +36,8 @@ def _main(args):
     media_config = MediaScribeConfig.MediaScribeConfig.from_yaml(
         Path(args["conf"]),
     )
-    if not args["no_llama"]:
-        llama_model = LlamaTextScribe.LlamaTextScribe(media_config)
-        prompt = utils.start_text_interation(llama_model, generate_image=True)
-    else:
-        logger.info("Introduce your prompt to generate the image:")
-        print("Prompt: ")
-        prompt = input(" ")
-
-    logger.info(
-        "Enter a negative prompt for image generation (leave blank if none):")
-    print("Negative Prompt: ")
-    negative_prompt = input(" ")
-
-    image_model = ImageVideoScribe.ImageVideoScribe(media_config)
-    try:
-        if args["path_image"]:
-            strength = float(args["strength"])
-            image_path = Path(args["path_image"])
-            image_model.generate_image_from_image(
-                prompt, image_path, strength, negative_prompt
-            )
-        else:
-            image_model.generate_image(prompt, negative_prompt)
-    except Exception as ex:
-        logger.error(
-            f"An error occurred: {ex.__class__.__name__} - {ex}", exc_info=True)
+    llama_model = LlamaTextScribe.LlamaTextScribe(media_config)
+    _ = utils.start_text_interation(llama_model, generate_image=False)
     return 0
 
 
@@ -68,39 +46,13 @@ def main():
 
     # Module specific
     argparser = argparse.ArgumentParser(
-        description="Welcome to Media Scribe for image generation",
+        description="Welcome to Media Scribe for text generation",
     )
-
     argparser.add_argument(
         "-c",
         "--conf",
         help="YAML configuration file",
         required=True,
-    )
-
-    argparser.add_argument(
-        "-i",
-        "--path-image",
-        help="Path to the reference image that will be used as a starting point to generate a new one.",
-        default=None,
-        required=False,
-    )
-
-    argparser.add_argument(
-        "-s",
-        "--strength",
-        help="Strength",
-        default=0.75,
-        required=False,
-    )
-
-    argparser.add_argument(
-        "-nl",
-        "--no-llama",
-        help="Disable loading the Llama model to improve image prompt generation",
-        action="store_true",
-        default=False,
-        required=False,
     )
 
     # Default Args
@@ -138,7 +90,6 @@ def main():
     else:
         logger.info("Running without profiling")
         r = _main(args)
-
     return r
 
 

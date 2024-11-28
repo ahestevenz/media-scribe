@@ -3,11 +3,11 @@ from __future__ import annotations
 
 from loguru import logger
 
-from bnMediaScribe import LlamaTextScribe as llama
+from media_scribe.llama_text_scribe import LlamaTextScribe
 
 
 def start_text_interation(
-    llama_model: llama.LlamaTextScribe,
+    llama_model: LlamaTextScribe,
     generate_image: bool = True,
 ) -> str:
     if generate_image:

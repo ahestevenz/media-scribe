@@ -16,13 +16,13 @@ from diffusers import (
 from PIL import Image
 from transformers import CLIPTokenizer
 
-from bnMediaScribe import MediaScribeConfig
+from media_scribe.media_scribe_config import MediaScribeConfig
 
 # from loguru import logger
 
 
 class ImageVideoScribe:
-    def __init__(self, config: MediaScribeConfig.MediaScribeConfig):
+    def __init__(self, config: MediaScribeConfig):
         self.config = config
         self.verbose = config.verbose
         self.load_refiner = self.config.sd_config.load_refiner
