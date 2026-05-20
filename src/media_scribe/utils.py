@@ -6,10 +6,11 @@ from loguru import logger
 from media_scribe.llama_text_scribe import LlamaTextScribe
 
 
-def start_text_interation(
+def start_text_interaction(
     llama_model: LlamaTextScribe,
     generate_image: bool = True,
 ) -> str:
+    prompt = ""
     if generate_image:
         logger.info("Introduce your prompt to generate the image:")
         print("You: ")

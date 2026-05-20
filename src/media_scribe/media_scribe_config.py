@@ -3,11 +3,10 @@ from __future__ import annotations
 
 from enum import Enum
 from pathlib import Path
-from typing import Dict, List, Optional
 
 import torch
 import yaml
-from pydantic import BaseModel, FieldValidationInfo, field_validator
+from pydantic import BaseModel, ConfigDict, ValidationInfo, field_validator
 
 
 class ModelImageType(str, Enum):
@@ -31,6 +30,8 @@ class OutputType(str, Enum):
 
 
 class LlamaModelScribeConfig(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
     model_type: ModelTextType = ModelTextType.LLAMA_8B
     model_name: Path
     max_num_historical_messages: int = 5
@@ -41,17 +42,15 @@ class LlamaModelScribeConfig(BaseModel):
     top_p: float = 0.9
 
     @field_validator("max_tokens", "max_input_tokens", mode="before")
-    def max_tokens_must_be_positive(
-        cls,
-        value: int,
-        info: FieldValidationInfo,
-    ):
+    @classmethod
+    def max_tokens_must_be_positive(cls, value: int, info: ValidationInfo) -> int:
         if value <= 0:
             raise ValueError(f"{info.field_name} must be a positive integer")
         return value
 
     @field_validator("max_num_historical_messages", mode="before")
-    def check_history_limit(cls, value):
+    @classmethod
+    def check_history_limit(cls, value: int) -> int:
         if value <= 0:
             raise ValueError(
                 "max_num_historical_messages must be a positive integer",
@@ -59,24 +58,24 @@ class LlamaModelScribeConfig(BaseModel):
         return value
 
     @property
-    def model_path(self):
-        return self.model_dir / self.model_filename
+    def model_path(self) -> Path:
+        return self.model_name
 
-    class Config:
-        protected_namespaces = ()
-
-    def get_generate_args(self):
+    def get_generate_args(self) -> dict:
         """Return the arguments required for the generate function."""
         return {
-            "max_tokens": self.max_tokens,
+            "max_new_tokens": self.max_tokens,
             "temperature": self.temperature,
             "top_p": self.top_p,
+            "do_sample": True,
         }
 
 
 class StableDiffusionScribeConfig(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
     model_type: ModelImageType = ModelImageType.CIVITAI
-    model_paths: Dict[ModelImageType, List[Optional[Path]]]
+    model_paths: dict[ModelImageType, list[Path | None]]
     load_refiner: bool = True
     num_inference_steps: int = 50
     guidance_scale: float = 0.7
@@ -84,17 +83,14 @@ class StableDiffusionScribeConfig(BaseModel):
     root_output_dir: Path
 
     @property
-    def base_model_path(self):
+    def base_model_path(self) -> Path | None:
         """Return the model path based on the selected model_type."""
         return self.model_paths[self.model_type][0]
 
     @property
-    def refiner_model_path(self):
-        """Set model_dir based on the model_type."""
+    def refiner_model_path(self) -> Path | None:
+        """Return the refiner model path based on the selected model_type."""
         return self.model_paths[self.model_type][1]
-
-    class Config:
-        protected_namespaces = ()
 
 
 class MediaScribeConfig(BaseModel):
@@ -104,7 +100,8 @@ class MediaScribeConfig(BaseModel):
     verbose: bool = False
 
     @field_validator("device", mode="before")
-    def check_device(cls, v, info: FieldValidationInfo):
+    @classmethod
+    def check_device(cls, v: str, info: ValidationInfo) -> str:
         if v not in ["cpu", "cuda", "mps"]:
             raise ValueError("Device must be either 'cpu', 'cuda', or 'mps'")
         if v == "cuda" and not torch.cuda.is_available():
@@ -118,7 +115,7 @@ class MediaScribeConfig(BaseModel):
         return v
 
     @classmethod
-    def from_yaml(cls, file_path: str):
+    def from_yaml(cls, file_path: str | Path) -> MediaScribeConfig:
         """Load the configuration from a YAML file."""
         with open(file_path) as file:
             config_data = yaml.safe_load(file)
@@ -126,9 +123,10 @@ class MediaScribeConfig(BaseModel):
         llama_config_data = config_data["llama_config"]
         sd_config_data = config_data["sd_config"]
 
+        root_models_path = Path(sd_config_data["root_models_path"])
         model_paths = {
             ModelImageType(k): [
-                sd_config_data["root_models_path"] / Path(p) if p else None for p in v
+                root_models_path / p if p else None for p in v
             ]
             for k, v in sd_config_data.pop("model_paths").items()
         }
@@ -144,7 +142,7 @@ class MediaScribeConfig(BaseModel):
             verbose=config_data.get("verbose", False),
         )
 
-    def _convert_to_serializable(self, obj):
+    def _convert_to_serializable(self, obj: object) -> object:
         if isinstance(obj, Path):
             return str(obj)
         if isinstance(obj, Enum):
@@ -155,8 +153,8 @@ class MediaScribeConfig(BaseModel):
             return [self._convert_to_serializable(v) for v in obj]
         return obj
 
-    def to_yaml(self, file_path: Path):
+    def to_yaml(self, file_path: Path) -> None:
         """Save the current instance's configuration to a YAML file."""
-        config_data = self.dict()
+        config_data = self.model_dump()
         with open(file_path, "w") as file:
             yaml.dump(self._convert_to_serializable(config_data), file)

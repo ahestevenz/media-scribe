@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
+from contextlib import nullcontext
 from datetime import datetime
 from pathlib import Path
-from typing import List
 
 import torch
 from diffusers import (
@@ -16,9 +16,9 @@ from diffusers import (
 from PIL import Image
 from transformers import CLIPTokenizer
 
-from media_scribe.media_scribe_config import MediaScribeConfig
+from media_scribe.media_scribe_config import MediaScribeConfig, ModelImageType
 
-# from loguru import logger
+from loguru import logger
 
 
 class ImageVideoScribe:
@@ -29,11 +29,15 @@ class ImageVideoScribe:
         self.load_img2img = False
         self.generated_directory = self._generate_directory()
         self.device = torch.device(config.device)
+        self._clip_tokenizer_truncate = CLIPTokenizer.from_pretrained(
+            "openai/clip-vit-large-patch14"
+        )
+        self._clip_tokenizer_split = CLIPTokenizer.from_pretrained(
+            "openai/clip-vit-base-patch32"
+        )
         self._load_model_pipelines()
 
-    def _generate_directory(
-        self,
-    ) -> Path:
+    def _generate_directory(self) -> Path:
         current_datetime = datetime.now()
         directory = (
             self.config.sd_config.root_output_dir
@@ -42,27 +46,23 @@ class ImageVideoScribe:
         directory.mkdir(parents=True, exist_ok=True)
         return directory
 
-    def _load_model_pipelines(
-        self,
-    ):
+    def _load_model_pipelines(self) -> None:
         match self.config.sd_config.model_type:
             case (
-                MediaScribeConfig.ModelImageType.CIVITAI
-                | MediaScribeConfig.ModelImageType.CIVITAI_TEST
-                | MediaScribeConfig.ModelImageType.SD_XL
+                ModelImageType.CIVITAI
+                | ModelImageType.CIVITAI_TEST
+                | ModelImageType.SD_XL
             ):
                 self.base_model_pipe = StableDiffusionXLPipeline.from_single_file(
                     self.config.sd_config.base_model_path,
                     torch_dtype=torch.float16,
                 ).to(self.device)
-                pass
-            case MediaScribeConfig.ModelImageType.SD_3:
+            case ModelImageType.SD_3:
                 self.base_model_pipe = StableDiffusion3Pipeline.from_single_file(
                     self.config.sd_config.base_model_path,
                     torch_dtype=torch.float16,
                 ).to(self.device)
-                pass
-            case MediaScribeConfig.ModelImageType.PIX_2_PIX:
+            case ModelImageType.PIX_2_PIX:
                 self.base_model_pipe = (
                     StableDiffusionInstructPix2PixPipeline.from_pretrained(
                         self.config.sd_config.base_model_path,
@@ -70,14 +70,12 @@ class ImageVideoScribe:
                     ).to(self.device)
                 )
                 self.load_img2img = True
-                pass
-            case MediaScribeConfig.ModelImageType.SD_1_5_IMG_2_IMG:
+            case ModelImageType.SD_1_5_IMG_2_IMG:
                 self.base_model_pipe = StableDiffusionImg2ImgPipeline.from_pretrained(
                     self.config.sd_config.base_model_path,
                     torch_dtype=torch.float16,
                 ).to(self.device)
                 self.load_img2img = True
-                pass
             case _:
                 raise NotImplementedError("Method does not exist!")
 
@@ -88,16 +86,15 @@ class ImageVideoScribe:
             ).to(self.device)
 
     def _truncate_prompt(self, prompt: str) -> str:
-        tokenizer = CLIPTokenizer.from_pretrained(
-            "openai/clip-vit-large-patch14")
-        tokens = tokenizer(prompt, truncation=True,
-                           max_length=77, return_tensors="pt")
-        return tokenizer.decode(tokens["input_ids"][0], skip_special_tokens=True)
+        tokens = self._clip_tokenizer_truncate(
+            prompt, truncation=True, max_length=77, return_tensors="pt"
+        )
+        return self._clip_tokenizer_truncate.decode(
+            tokens["input_ids"][0], skip_special_tokens=True
+        )
 
-    def _split_prompt(self, prompt: str, max_tokens: int = 77) -> List[str]:
-        tokenizer = CLIPTokenizer.from_pretrained(
-            "openai/clip-vit-base-patch32")
-        tokens = tokenizer.encode(prompt, add_special_tokens=False)
+    def _split_prompt(self, prompt: str, max_tokens: int = 77) -> list[str]:
+        tokens = self._clip_tokenizer_split.encode(prompt, add_special_tokens=False)
         if len(tokens) <= max_tokens:
             return [prompt]
         words = prompt.split()
@@ -105,7 +102,9 @@ class ImageVideoScribe:
         chunk_2 = []
         current_tokens = 0
         for word in words:
-            word_tokens = tokenizer.encode(word, add_special_tokens=False)
+            word_tokens = self._clip_tokenizer_split.encode(
+                word, add_special_tokens=False
+            )
             if current_tokens + len(word_tokens) > max_tokens:
                 chunk_2.append(word)
             else:
@@ -113,7 +112,7 @@ class ImageVideoScribe:
                 current_tokens += len(word_tokens)
         return [" ".join(chunk_1), " ".join(chunk_2)]
 
-    def _preprocess_image(self, image_path: Path) -> Image:
+    def _preprocess_image(self, image_path: Path) -> Image.Image:
         image = Image.open(image_path)
         if image.mode != "RGB":
             image = image.convert("RGB")
@@ -129,122 +128,115 @@ class ImageVideoScribe:
     ) -> Path:
         if not img_path.exists():
             raise FileNotFoundError("Image not found")
-        filename = "generated_image"
-        image_path: Path = self.generated_directory / f"edited_{filename}.png"
-        if self.load_img2img:
-            init_image = self._preprocess_image(img_path)
-            prompt = self._truncate_prompt(prompt)
+        if not self.load_img2img:
+            raise RuntimeError(
+                "Image-to-image generation models are not loaded. Please verify the configuration file."
+            )
+        image_path: Path = self.generated_directory / "edited_generated_image.png"
+        init_image = self._preprocess_image(img_path)
+        prompt = self._truncate_prompt(prompt)
 
-            edited_image = self.base_model_pipe(
+        edited_image = self.base_model_pipe(
+            prompt=prompt,
+            image=init_image,
+            strength=strength,
+            negative_prompt=negative_prompt,
+            num_inference_steps=self.config.sd_config.num_inference_steps,
+            guidance_scale=self.config.sd_config.guidance_scale,
+        ).images[0]
+
+        edited_image.save(image_path)
+        self.config.to_yaml(self.generated_directory / "config.yml")
+        return image_path
+
+    def generate_image(self, prompt: str, negative_prompt: str = "") -> Path:
+        if self.load_img2img:
+            raise RuntimeError(
+                "Image-to-image generation models are loaded. Please verify the configuration file."
+            )
+        filename = "generated_image"
+        prompt = self._truncate_prompt(prompt)
+        ctx = torch.autocast("cuda") if self.device.type == "cuda" else nullcontext()
+
+        with ctx:
+            base_image = self.base_model_pipe(
                 prompt=prompt,
-                image=init_image,
-                strength=strength,
                 negative_prompt=negative_prompt,
                 num_inference_steps=self.config.sd_config.num_inference_steps,
                 guidance_scale=self.config.sd_config.guidance_scale,
             ).images[0]
 
-            edited_image.save(image_path)
-        else:
-            raise AttributeError(
-                "Error: Image-to-image generation models are not loaded. Please verify the configuration file."
-            )
-        self.config.to_yaml(self.generated_directory / "config.yml")
-        return image_path
+        image_path: Path = self.generated_directory / f"base_{filename}.png"
 
-    def generate_image(self, prompt: str, negative_prompt: str = "") -> Path:
-        filename = "generated_image"
-        if not self.load_img2img:
-            prompt = self._truncate_prompt(prompt)
-            if self.device.type == "cuda":
-                with torch.autocast("cuda"):
-                    base_image = self.base_model_pipe(
-                        prompt,
-                        negative_prompt=negative_prompt,
-                        num_inference_steps=self.config.sd_config.num_inference_steps,
-                        guidance_scale=self.config.sd_config.guidance_scale,
-                    ).images[0]
-            else:
-                base_image = self.base_model_pipe(
-                    prompt,
+        if self.verbose:
+            base_image.save(image_path)
+
+        if self.load_refiner:
+            with ctx:
+                refined_image = self.refiner_model_pipe(
+                    prompt=prompt,
+                    image=base_image,
                     negative_prompt=negative_prompt,
                     num_inference_steps=self.config.sd_config.num_inference_steps,
                     guidance_scale=self.config.sd_config.guidance_scale,
                 ).images[0]
 
-            image_path: Path = self.generated_directory / \
-                f"base_{filename}.png"
-
-            if self.verbose:
-                base_image.save(image_path)
-
-            if self.load_refiner:
-                if self.device.type == "cuda":
-                    with torch.autocast("cuda"):
-                        refined_image = self.refiner_model_pipe(
-                            prompt,
-                            image=base_image,
-                            negative_prompt=negative_prompt,
-                            num_inference_steps=self.config.sd_config.num_inference_steps,
-                            guidance_scale=self.config.sd_config.guidance_scale,
-                        ).images[0]
-                else:
-                    refined_image = self.refiner_model_pipe(
-                        prompt,
-                        image=base_image,
-                        negative_prompt=negative_prompt,
-                        num_inference_steps=self.config.sd_config.num_inference_steps,
-                        guidance_scale=self.config.sd_config.guidance_scale,
-                    ).images[0]
-
-                image_path = self.generated_directory / \
-                    f"refined_{filename}.png"
-                refined_image.save(image_path)
-            else:
-                base_image.save(image_path)
+            image_path = self.generated_directory / f"refined_{filename}.png"
+            refined_image.save(image_path)
         else:
-            raise AttributeError(
-                "Error: Image-to-image generation models are loaded. Please verify the configuration file."
-            )
+            base_image.save(image_path)
+
         self.config.to_yaml(self.generated_directory / "config.yml")
         return image_path
 
-    # TODO: generate video once image generation workflow is done
-    # def generate_video(self, prompts: List[str]):
+    def generate_video(
+        self,
+        prompts: list[str],
+        fps: int = 8,
+        num_inference_steps: int = 20,
+        negative_prompt: str = "",
+    ) -> Path:
+        """Generate a short animated WebP from a sequence of text prompts.
 
-    #     frames = []
-    #     fps = 23 # TODO: Get it from config
-    #     frame_count = len(prompts)
-    #     # Generate frames by modifying the prompt slightly each time
-    #     for i in range(frame_count):
-    #         # Modify the prompt to add variation, e.g., changing lighting or scene elements
-    #         prompt = prompts[i]
+        Each prompt becomes one frame, so keep the list short (4-12 entries)
+        for reasonable generation time on MPS.  Individual frames are also
+        saved as PNGs in the output directory for full-quality inspection.
+        """
+        if self.load_img2img:
+            raise RuntimeError(
+                "generate_video requires a text-to-image model. "
+                "PIX_2_PIX and SD_1_5_IMG_2_IMG are not supported."
+            )
+        if not prompts:
+            raise ValueError("prompts must not be empty")
 
-    #         # Generate an image
-    #         if self.device.type == "cuda":
-    #             with torch.autocast("cuda"):
-    #                 image = self.base_model_pipe(prompt=prompt).images[0]
-    #         else:
-    #             image = self.base_model_pipe(prompt=prompt).images[0]
+        ctx = torch.autocast("cuda") if self.device.type == "cuda" else nullcontext()
+        frames: list[Image.Image] = []
 
-    #         # Save the frame to the directory and add to frames list
-    #         frame_path = os.path.join(self.root_ouput_path, f"frame_{i:03d}.png")
-    #         image.save(frame_path)
-    #         frames.append(np.array(image))
+        for i, prompt in enumerate(prompts):
+            logger.info(f"Generating frame {i + 1}/{len(prompts)}")
+            truncated = self._truncate_prompt(prompt)
+            with ctx:
+                image = self.base_model_pipe(
+                    prompt=truncated,
+                    negative_prompt=negative_prompt,
+                    num_inference_steps=num_inference_steps,
+                    guidance_scale=self.config.sd_config.guidance_scale,
+                ).images[0]
+            frame_path = self.generated_directory / f"frame_{i:03d}.png"
+            image.save(frame_path)
+            frames.append(image)
 
-    #         print(f"Generated frame {i}/{frame_count}")
-
-    #     # Save frames as a video using OpenCV
-    #     video_path = os.path.join(self.root_ouput_path,video_filename)
-    #     frame_height, frame_width, _ = frames[0].shape
-    #     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-    #     video = cv2.VideoWriter(video_path, fourcc, fps, (frame_width, frame_height))
-
-    #     # Write frames to the video
-    #     for frame in frames:
-    #         video.write(cv2.cvtColor(frame, cv2.COLOR_RGB2BGR))
-
-    #     # Release the video writer
-    #     video.release()
-
-    #     print(f"Video saved at {video_path}")
+        video_path = self.generated_directory / "generated_video.webp"
+        frames[0].save(
+            video_path,
+            format="WEBP",
+            save_all=True,
+            append_images=frames[1:],
+            duration=1000 // fps,
+            loop=0,
+            quality=85,
+        )
+        logger.info(f"Video saved to {video_path}")
+        self.config.to_yaml(self.generated_directory / "config.yml")
+        return video_path

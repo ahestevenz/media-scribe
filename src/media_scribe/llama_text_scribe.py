@@ -51,7 +51,7 @@ class LlamaTextScribe:
         inputs = self.tokenizer(summary_prompt, return_tensors="pt").to(
             self.device,
         )
-        summary_output = self.model.generate(**inputs, max_length=150)
+        summary_output = self.model.generate(**inputs, max_new_tokens=150)
         summary = self.tokenizer.decode(
             summary_output[0],
             skip_special_tokens=True,
@@ -93,8 +93,10 @@ class LlamaTextScribe:
         inputs = self.tokenizer(prompt, return_tensors="pt").to(self.device)
         output = self.model.generate(
             **inputs,
-            max_length=self.config.max_tokens,
-            temperature=0.7,
+            max_new_tokens=self.config.max_tokens,
+            temperature=self.config.temperature,
+            top_p=self.config.top_p,
+            do_sample=True,
             pad_token_id=self.tokenizer.pad_token_id,
         )
         generated_text = (

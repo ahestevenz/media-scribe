@@ -17,8 +17,8 @@ from media_scribe.media_scribe_config import MediaScribeConfig
 logging.set_verbosity_error()
 
 __author__ = ["Ariel Hernandez <ahestevenz@bleiben.ar>"]
-__copyright__ = "Copyright 2024 Bleiben. All rights reserved."
-__license__ = """General Public License"""
+__copyright__ = "Copyright (c) 2024 Ariel Hernandez"
+__license__ = "MIT"
 
 
 def _main(args):
@@ -33,11 +33,11 @@ def _main(args):
         )
         return -1
 
-    media_config = MediaScribeConfig.MediaScribeConfig.from_yaml(
+    media_config = MediaScribeConfig.from_yaml(
         Path(args["conf"]),
     )
-    llama_model = LlamaTextScribe.LlamaTextScribe(media_config)
-    _ = utils.start_text_interation(llama_model, generate_image=False)
+    llama_model = LlamaTextScribe(media_config)
+    _ = utils.start_text_interaction(llama_model, generate_image=False)
     return 0
 
 
