@@ -1,0 +1,56 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "media-scribe"
+version = "0.1.0"
+description = "Media Content Generator"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "Ariel Hernandez", email = "ahestevenz@bleiben.ar" }]
+keywords = ["llm", "image", "video", "ai", "generation"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Programming Language :: Python :: 3",
+    "Intended Audience :: Developers",
+]
+requires-python = ">=3.10"
+dependencies = [
+    "numpy==2.1.1",
+    "torch==2.4.1",
+    "torchaudio==2.4.1",
+    "torchvision==0.19.1",
+    "diffusers==0.30.3",
+    "transformers==4.45.1",
+    "pydantic==2.7.4",
+    "pillow==10.4.0",
+    "loguru==0.7.2",
+    "accelerate==1.0.0",
+    "protobuf==5.28.3",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pre-commit>=4.0.0",
+    "pytest>=7.0",
+]
+
+[project.urls]
+Repository = "https://github.com/ahestevenz/media-scribe"
+
+[project.scripts]
+bn-run-scribe-text = "media_scribe.scripts.run_scribe_text:main"
+bn-run-scribe-image = "media_scribe.scripts.run_scribe_image:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.isort]
+profile = "black"
+
+[tool.mypy]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
