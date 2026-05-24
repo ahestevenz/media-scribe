@@ -1,4 +1,6 @@
 verbose: true
+
+# Compute device: "mps" (Apple Silicon), "cuda" (NVIDIA), or "cpu"
 device: "mps"
 
 llama_config:
@@ -10,22 +12,41 @@ llama_config:
   top_p: 0.9
 
 sd_config:
-  root_models_path: ~/.cache/huggingface/hub
-  root_output_dir: ~/Desktop/hola
+  # HuggingFace model cache root.
+  # Falls back to $HF_HOME, then ~/.cache/huggingface/hub
+  root_models_path: "${MS_HF_CACHE_DIR}"
+
+  # Directory where generated images/videos are saved.
+  # Override with the MS_OUTPUT_DIR environment variable.
+  root_output_dir: "${MS_OUTPUT_DIR:-./outputs}"
+
+  # Active model type for image generation. Must be one of the keys listed under model_paths below.
+  # Options: sd_3 | sd_xl | civitai | pix_2_pix | sd_1_5_img_2_img
   model_type: "sd_3"
+
+  # SVD checkpoint for bn-run-scribe-video.
+  # - Local path (relative to root_models_path): models--stabilityai--stable-video-diffusion-img2vid-xt/...
+  # - HuggingFace hub ID: stabilityai/stable-video-diffusion-img2vid-xt
+  # - Omit or set to null to auto-download from HF hub on first run.
+  svd_model_path: null
+
   model_paths:
     sd_3:
       - models--stabilityai--stable-diffusion-3-medium-diffusers/sd3_medium_incl_clips_t5xxlfp16.safetensors
       - models--Stable-Diffusion-XL/sd_xl_refiner_1.0.safetensors
+
     sd_xl:
       - models--Stable-Diffusion-XL/sd_xl_base_1.0.safetensors
       - models--Stable-Diffusion-XL/sd_xl_refiner_1.0.safetensors
+
     civitai:
       - models--civitai/juggernautXL_juggXIByRundiffusion.safetensors
       - models--Stable-Diffusion-XL/sd_xl_refiner_1.0.safetensors
+
     pix_2_pix:
       - models--timbrooks--instruct-pix2pix/snapshots/31519b5cb02a7fd89b906d88731cd4d6a7bbf88d
       - null
+
     sd_1_5_img_2_img:
       - models--radames--stable-diffusion-v1-5-img2img/snapshots/cac24f945bd8f5604e243550bb3092be11964805
       - null
