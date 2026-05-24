@@ -128,6 +128,8 @@ def main():
     logger.remove()
     logger.add(sys.stdout, level=_V_LEVELS[loglevel])
 
+    utils.setup_ctrl_q_handler()
+
     if args["profile"] is not None:
         logger.info("Start profiling")
         r = 1

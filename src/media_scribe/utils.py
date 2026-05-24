@@ -1,9 +1,29 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
+import signal
+import sys
+import termios
+
 from loguru import logger
 
 from media_scribe.llama_text_scribe import LlamaTextScribe
+
+
+def setup_ctrl_q_handler() -> None:
+    """Register Ctrl+Q as a clean exit key (no traceback)."""
+
+    def _handle_quit(signum, frame):
+        logger.info("Cancelled by user (Ctrl+Q)")
+        sys.exit(0)
+
+    signal.signal(signal.SIGQUIT, _handle_quit)
+    try:
+        attr = termios.tcgetattr(sys.stdin.fileno())
+        attr[6][termios.VQUIT] = b"\x11"
+        termios.tcsetattr(sys.stdin.fileno(), termios.TCSANOW, attr)
+    except (termios.error, OSError):
+        pass
 
 
 def start_text_interaction(
