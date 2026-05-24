@@ -81,6 +81,7 @@ class StableDiffusionScribeConfig(BaseModel):
     guidance_scale: float = 0.7
     root_models_path: Path
     root_output_dir: Path
+    svd_model_path: Path | str | None = None
 
     @property
     def base_model_path(self) -> Path | None:
@@ -123,7 +124,10 @@ class MediaScribeConfig(BaseModel):
         llama_config_data = config_data["llama_config"]
         sd_config_data = config_data["sd_config"]
 
-        root_models_path = Path(sd_config_data["root_models_path"])
+        root_models_path = Path(
+            sd_config_data["root_models_path"]).expanduser()
+        sd_config_data["root_output_dir"] = Path(
+            sd_config_data["root_output_dir"]).expanduser()
         model_paths = {
             ModelImageType(k): [
                 root_models_path / p if p else None for p in v
@@ -131,9 +135,20 @@ class MediaScribeConfig(BaseModel):
             for k, v in sd_config_data.pop("model_paths").items()
         }
 
+        raw_svd = sd_config_data.pop("svd_model_path", None)
+        if raw_svd is not None:
+            # Relative path → resolve against root_models_path; HF hub IDs kept as str
+            svd_candidate = Path(raw_svd)
+            svd_model_path: Path | str | None = (
+                root_models_path / svd_candidate if not svd_candidate.is_absolute() and "/" not in raw_svd
+                else raw_svd
+            )
+        else:
+            svd_model_path = None
+
         llama_config = LlamaModelScribeConfig(**llama_config_data)
         sd_config = StableDiffusionScribeConfig(
-            **sd_config_data, model_paths=model_paths)
+            **sd_config_data, model_paths=model_paths, svd_model_path=svd_model_path)
 
         return cls(
             llama_config=llama_config,

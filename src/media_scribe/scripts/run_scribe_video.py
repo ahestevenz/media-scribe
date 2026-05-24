@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Command line script to upload a whole directory tree."""
+"""Command line script to generate a coherent video from a single text prompt via SVD."""
 from __future__ import annotations
 
 import argparse
@@ -34,32 +34,33 @@ def _main(args):
         )
         return -1
 
-    media_config = MediaScribeConfig.from_yaml(
-        Path(args["conf"]),
-    )
+    media_config = MediaScribeConfig.from_yaml(Path(args["conf"]))
+
     if not args["no_llama"]:
-        llama_model = LlamaTextScribe(config=media_config)
+        llama_model = LlamaTextScribe(media_config)
         prompt = utils.start_text_interaction(llama_model, generate_image=True)
     else:
-        logger.info("Introduce your prompt to generate the image:")
+        logger.info("Introduce your prompt to generate the video:")
         print("Prompt: ")
         prompt = input(" ")
 
     logger.info(
-        "Enter a negative prompt for image generation (leave blank if none):")
+        "Enter a negative prompt for video generation (leave blank if none):")
     print("Negative Prompt: ")
     negative_prompt = input(" ")
 
-    image_model = ImageVideoScribe(media_config)
+    video_model = ImageVideoScribe(config=media_config)
     try:
-        if args["path_image"]:
-            strength = float(args["strength"])
-            image_path = Path(args["path_image"])
-            image_model.generate_image_from_image(
-                prompt, image_path, strength, negative_prompt
-            )
-        else:
-            image_model.generate_image(prompt, negative_prompt)
+        video_model.generate_video_svd(
+            prompt=prompt,
+            negative_prompt=negative_prompt,
+            num_frames=args["num_frames"],
+            fps=args["fps"],
+            motion_bucket_id=args["motion_bucket_id"],
+            noise_aug_strength=args["noise_aug_strength"],
+            num_inference_steps=args["num_inference_steps"],
+            decode_chunk_size=args["decode_chunk_size"],
+        )
     except Exception as ex:
         logger.error(
             f"An error occurred: {ex.__class__.__name__} - {ex}", exc_info=True)
@@ -67,11 +68,10 @@ def _main(args):
 
 
 def main():
-    """CLI for upload the encripted files"""
+    """CLI for video generation"""
 
-    # Module specific
     argparser = argparse.ArgumentParser(
-        description="Welcome to Media Scribe for image generation",
+        description="Welcome to Media Scribe for video generation",
     )
 
     argparser.add_argument(
@@ -82,25 +82,58 @@ def main():
     )
 
     argparser.add_argument(
-        "-i",
-        "--path-image",
-        help="Path to the reference image that will be used as a starting point to generate a new one.",
-        default=None,
+        "-n",
+        "--num-frames",
+        help="Number of video frames to generate (14 or 25 for SVD)",
+        type=int,
+        default=25,
         required=False,
     )
 
     argparser.add_argument(
-        "-s",
-        "--strength",
-        help="Strength",
-        default=0.75,
+        "--fps",
+        help="Frames per second for the output video",
+        type=int,
+        default=7,
+        required=False,
+    )
+
+    argparser.add_argument(
+        "--motion-bucket-id",
+        help="Controls motion amount (0–255); higher = more motion",
+        type=int,
+        default=127,
+        required=False,
+    )
+
+    argparser.add_argument(
+        "--noise-aug-strength",
+        help="Noise augmentation on the anchor frame (0.0–1.0); higher = more variation",
+        type=float,
+        default=0.02,
+        required=False,
+    )
+
+    argparser.add_argument(
+        "--num-inference-steps",
+        help="Number of denoising steps",
+        type=int,
+        default=25,
+        required=False,
+    )
+
+    argparser.add_argument(
+        "--decode-chunk-size",
+        help="Frames decoded at once by the VAE; lower values reduce peak memory (default: 4)",
+        type=int,
+        default=4,
         required=False,
     )
 
     argparser.add_argument(
         "-nl",
         "--no-llama",
-        help="Disable loading the Llama model to improve image prompt generation",
+        help="Disable loading the Llama model to improve the video prompt",
         action="store_true",
         default=False,
         required=False,

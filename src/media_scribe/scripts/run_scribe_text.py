@@ -36,7 +36,7 @@ def _main(args):
     media_config = MediaScribeConfig.from_yaml(
         Path(args["conf"]),
     )
-    llama_model = LlamaTextScribe(media_config)
+    llama_model = LlamaTextScribe(config=media_config)
     _ = utils.start_text_interaction(llama_model, generate_image=False)
     return 0
 

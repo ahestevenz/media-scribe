@@ -12,13 +12,13 @@ from diffusers import (
     StableDiffusionInstructPix2PixPipeline,
     StableDiffusionXLImg2ImgPipeline,
     StableDiffusionXLPipeline,
+    StableVideoDiffusionPipeline,
 )
+from loguru import logger
 from PIL import Image
 from transformers import CLIPTokenizer
 
 from media_scribe.media_scribe_config import MediaScribeConfig, ModelImageType
-
-from loguru import logger
 
 
 class ImageVideoScribe:
@@ -35,6 +35,7 @@ class ImageVideoScribe:
         self._clip_tokenizer_split = CLIPTokenizer.from_pretrained(
             "openai/clip-vit-base-patch32"
         )
+        self.svd_pipe: StableVideoDiffusionPipeline | None = None
         self._load_model_pipelines()
 
     def _generate_directory(self) -> Path:
@@ -94,7 +95,8 @@ class ImageVideoScribe:
         )
 
     def _split_prompt(self, prompt: str, max_tokens: int = 77) -> list[str]:
-        tokens = self._clip_tokenizer_split.encode(prompt, add_special_tokens=False)
+        tokens = self._clip_tokenizer_split.encode(
+            prompt, add_special_tokens=False)
         if len(tokens) <= max_tokens:
             return [prompt]
         words = prompt.split()
@@ -156,7 +158,8 @@ class ImageVideoScribe:
             )
         filename = "generated_image"
         prompt = self._truncate_prompt(prompt)
-        ctx = torch.autocast("cuda") if self.device.type == "cuda" else nullcontext()
+        ctx = torch.autocast(
+            "cuda") if self.device.type == "cuda" else nullcontext()
 
         with ctx:
             base_image = self.base_model_pipe(
@@ -189,6 +192,110 @@ class ImageVideoScribe:
         self.config.to_yaml(self.generated_directory / "config.yml")
         return image_path
 
+    def _load_svd_pipeline(self) -> None:
+        _SVD_HF_ID = "stabilityai/stable-video-diffusion-img2vid-xt"
+        svd_source = self.config.sd_config.svd_model_path or _SVD_HF_ID
+        logger.info(f"Loading SVD pipeline from {svd_source}")
+        self.svd_pipe = StableVideoDiffusionPipeline.from_pretrained(
+            svd_source,
+            torch_dtype=torch.float16,
+            variant="fp16",
+        )
+        if self.device.type == "cuda":
+            self.svd_pipe.enable_model_cpu_offload()
+        else:
+            self.svd_pipe = self.svd_pipe.to(self.device)
+        self.svd_pipe.enable_attention_slicing(1)
+        self.svd_pipe.enable_vae_slicing()
+
+    def generate_video_svd(
+        self,
+        prompt: str,
+        negative_prompt: str = "",
+        num_frames: int = 25,
+        fps: int = 7,
+        motion_bucket_id: int = 127,
+        noise_aug_strength: float = 0.02,
+        num_inference_steps: int = 25,
+        decode_chunk_size: int = 4,
+    ) -> Path:
+        """Generate a temporally coherent video from a single text prompt using SVD.
+
+        Workflow: text prompt → anchor image (base_model_pipe) → video frames (SVD).
+        SVD conditions every frame on the anchor image, ensuring visual coherence
+        without per-frame prompt engineering.
+        """
+        if self.load_img2img:
+            raise RuntimeError(
+                "generate_video_svd requires a text-to-image base model. "
+                "PIX_2_PIX and SD_1_5_IMG_2_IMG are not supported."
+            )
+
+        logger.info("Generating anchor frame from prompt...")
+        truncated_prompt = self._truncate_prompt(prompt)
+        ctx = torch.autocast(
+            "cuda") if self.device.type == "cuda" else nullcontext()
+        with ctx:
+            anchor_image: Image.Image = self.base_model_pipe(
+                prompt=truncated_prompt,
+                negative_prompt=negative_prompt,
+                num_inference_steps=self.config.sd_config.num_inference_steps,
+                guidance_scale=self.config.sd_config.guidance_scale,
+            ).images[0]
+
+        anchor_path = self.generated_directory / "anchor_frame.png"
+        anchor_image.save(anchor_path)
+        logger.info(f"Anchor frame saved to {anchor_path}")
+
+        # Free the base model from device memory before loading SVD
+        logger.info(
+            "Offloading base model to CPU to free device memory for SVD...")
+        self.base_model_pipe.to("cpu")
+        if self.device.type == "cuda":
+            torch.cuda.empty_cache()
+        elif self.device.type == "mps":
+            torch.mps.empty_cache()
+
+        if self.svd_pipe is None:
+            self._load_svd_pipeline()
+        assert self.svd_pipe is not None
+
+        # SVD expects 1024×576; use 512×320 on MPS to reduce peak activation memory
+        if self.device.type == "mps":
+            svd_image = anchor_image.resize((512, 320))
+            logger.info(
+                "MPS device: resizing anchor to 512×320 to fit device memory")
+        else:
+            svd_image = anchor_image.resize((1024, 576))
+
+        logger.info(f"Generating {num_frames} video frames with SVD...")
+        frames: list[Image.Image] = self.svd_pipe(
+            svd_image,
+            num_frames=num_frames,
+            num_inference_steps=num_inference_steps,
+            fps=fps,
+            motion_bucket_id=motion_bucket_id,
+            noise_aug_strength=noise_aug_strength,
+            decode_chunk_size=decode_chunk_size,
+        ).frames[0]
+
+        for i, frame in enumerate(frames):
+            frame.save(self.generated_directory / f"frame_{i:03d}.png")
+
+        video_path = self.generated_directory / "generated_video.webp"
+        frames[0].save(
+            video_path,
+            format="WEBP",
+            save_all=True,
+            append_images=frames[1:],
+            duration=1000 // fps,
+            loop=0,
+            quality=85,
+        )
+        logger.info(f"Video saved to {video_path}")
+        self.config.to_yaml(self.generated_directory / "config.yml")
+        return video_path
+
     def generate_video(
         self,
         prompts: list[str],
@@ -210,7 +317,8 @@ class ImageVideoScribe:
         if not prompts:
             raise ValueError("prompts must not be empty")
 
-        ctx = torch.autocast("cuda") if self.device.type == "cuda" else nullcontext()
+        ctx = torch.autocast(
+            "cuda") if self.device.type == "cuda" else nullcontext()
         frames: list[Image.Image] = []
 
         for i, prompt in enumerate(prompts):
