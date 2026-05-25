@@ -20,6 +20,8 @@ from transformers import CLIPTokenizer
 
 from media_scribe.media_scribe_config import MediaScribeConfig, ModelImageType
 
+SVD_HF_ID: str = "stabilityai/stable-video-diffusion-img2vid-xt"
+
 
 class ImageVideoScribe:
     def __init__(self, config: MediaScribeConfig):
@@ -63,9 +65,16 @@ class ImageVideoScribe:
                     torch_dtype=torch.float16,
                 ).to(self.device)
             case ModelImageType.SD_3:
+                sd3_kwargs: dict = {"torch_dtype": torch.float16}
+                if self.device.type == "mps":
+                    # T5-XXL is ~39 GB at fp16 — exceeds the MPS single-buffer
+                    # limit on Apple Silicon. Drop it; the two CLIP encoders
+                    # still produce high-quality results.
+                    sd3_kwargs["text_encoder_3"] = None
+                    sd3_kwargs["tokenizer_3"] = None
                 self.base_model_pipe = StableDiffusion3Pipeline.from_single_file(
                     base_model_path.as_posix(),
-                    torch_dtype=torch.float16,
+                    **sd3_kwargs,
                 ).to(self.device)
             case ModelImageType.PIX_2_PIX:
                 self.base_model_pipe = (
@@ -200,8 +209,7 @@ class ImageVideoScribe:
         return image_path
 
     def _load_svd_pipeline(self) -> None:
-        _SVD_HF_ID = "stabilityai/stable-video-diffusion-img2vid-xt"
-        svd_source = self.config.sd_config.svd_model_path or _SVD_HF_ID
+        svd_source = self.config.sd_config.svd_model_path or SVD_HF_ID
         logger.info(f"Loading SVD pipeline from {svd_source}")
         self.svd_pipe = StableVideoDiffusionPipeline.from_pretrained(
             svd_source,
@@ -212,8 +220,12 @@ class ImageVideoScribe:
             self.svd_pipe.enable_model_cpu_offload()
         else:
             self.svd_pipe = self.svd_pipe.to(self.device)
+
+        # slice_size=1 processes one attention head at a time — maximum memory
+        # reduction, necessary on MPS where flash attention is unavailable.
         self.svd_pipe.enable_attention_slicing(1)
-        self.svd_pipe.enable_vae_slicing()
+        if hasattr(self.svd_pipe, "enable_vae_slicing"):
+            self.svd_pipe.enable_vae_slicing()
         if self.svd_pipe is None:
             raise ValueError("svd_pipe cannot be None")
 
@@ -256,31 +268,51 @@ class ImageVideoScribe:
         anchor_image.save(anchor_path)
         logger.info(f"Anchor frame saved to {anchor_path}")
 
-        # Free the base model from device memory before loading SVD
-        logger.info(
-            "Offloading base model to CPU to free device memory for SVD...")
-        self.base_model_pipe.to("cpu")
-        if self.device.type == "cuda":
-            torch.cuda.empty_cache()
-        elif self.device.type == "mps":
+        # Free the base model before loading SVD.
+        logger.info("Freeing base model memory before loading SVD...")
+        import gc
+        import warnings
+        if self.device.type == "mps":
+            # .to("cpu") does not release MPS allocations; deleting the
+            # pipeline and forcing GC is the only reliable way to free the pool.
+            del self.base_model_pipe
+            gc.collect()
             torch.mps.empty_cache()
+        else:
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", message=".*float16.*cpu.*")
+                self.base_model_pipe.to("cpu")
+            if self.device.type == "cuda":
+                torch.cuda.empty_cache()
 
         if self.svd_pipe is None:
             self._load_svd_pipeline()
 
-        # SVD expects 1024×576; use 512×320 on MPS to reduce peak activation memory
         if self.device.type == "mps":
-            svd_image = anchor_image.resize((512, 320))
-            logger.info(
-                "MPS device: resizing anchor to 512×320 to fit device memory")
+            # Both dimensions must be divisible by 64 (VAE scale 8 × UNet
+            # 3-stage scale 8) so every encoder halving produces an integer
+            # that the decoder skip connection can match exactly.
+            # 256×144 fails: latent height 18 → 9 → 5 → 3, decoder upsamples
+            # 3→6 but skip is 5, causing "Expected size 6 but got size 5".
+            # 320×192 (both divisible by 64) is the smallest valid wide-format
+            # resolution; 576×1024 is the only valid 16:9 option.
+            svd_w, svd_h = 320, 192
+            decode_chunk_size = 1
+            torch.mps.empty_cache()
         else:
-            svd_image = anchor_image.resize((1024, 576))
+            svd_w, svd_h = 1024, 576
 
+        svd_image = anchor_image.resize((svd_w, svd_h))
+        logger.info(f"SVD input resized to {svd_w}×{svd_h}")
         logger.info(f"Generating {num_frames} video frames with SVD...")
+
         if self.svd_pipe is None:
             raise ValueError("self.svd_pipe failed to initialize")
+
         frames: list[Image.Image] = self.svd_pipe(
             svd_image,
+            height=svd_h,
+            width=svd_w,
             num_frames=num_frames,
             num_inference_steps=num_inference_steps,
             fps=fps,
