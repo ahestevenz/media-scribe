@@ -221,7 +221,9 @@ class ImageVideoScribe:
         else:
             self.svd_pipe = self.svd_pipe.to(self.device)
 
-        self.svd_pipe.enable_attention_slicing()
+        # slice_size=1 processes one attention head at a time — maximum memory
+        # reduction, necessary on MPS where flash attention is unavailable.
+        self.svd_pipe.enable_attention_slicing(1)
         if hasattr(self.svd_pipe, "enable_vae_slicing"):
             self.svd_pipe.enable_vae_slicing()
         if self.svd_pipe is None:
@@ -286,20 +288,22 @@ class ImageVideoScribe:
         if self.svd_pipe is None:
             self._load_svd_pipeline()
 
-        # SVD expects 1024×576 (16:9).  At 512×320, peak MPS activation buffers
-        # exceed 36 GB on M-series unified memory.  384×216 keeps 16:9 and cuts
-        # spatial area by ~50 %, which brings peak usage comfortably under 24 GB.
         if self.device.type == "mps":
-            decode_chunk_size = 1  # override caller's value
-            logger.info(
-                "MPS device: forcing decode_chunk_size=1 to reduce peak memory")
-            svd_image = anchor_image.resize((256, 144))
-            logger.info(
-                "MPS device: resizing anchor to (256, 144) to fit device memory")
+            # Both dimensions must be divisible by 64 (VAE scale 8 × UNet
+            # 3-stage scale 8) so every encoder halving produces an integer
+            # that the decoder skip connection can match exactly.
+            # 256×144 fails: latent height 18 → 9 → 5 → 3, decoder upsamples
+            # 3→6 but skip is 5, causing "Expected size 6 but got size 5".
+            # 320×192 (both divisible by 64) is the smallest valid wide-format
+            # resolution; 576×1024 is the only valid 16:9 option.
+            svd_w, svd_h = 320, 192
+            decode_chunk_size = 1
             torch.mps.empty_cache()
         else:
-            svd_image = anchor_image.resize((1024, 576))
+            svd_w, svd_h = 1024, 576
 
+        svd_image = anchor_image.resize((svd_w, svd_h))
+        logger.info(f"SVD input resized to {svd_w}×{svd_h}")
         logger.info(f"Generating {num_frames} video frames with SVD...")
 
         if self.svd_pipe is None:
@@ -307,6 +311,8 @@ class ImageVideoScribe:
 
         frames: list[Image.Image] = self.svd_pipe(
             svd_image,
+            height=svd_h,
+            width=svd_w,
             num_frames=num_frames,
             num_inference_steps=num_inference_steps,
             fps=fps,

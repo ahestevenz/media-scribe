@@ -436,6 +436,42 @@ The pre-commit pipeline runs: `autopep8`, `flake8` (max line length 120), `mypy`
 
 ---
 
+## Known Issues
+
+### Apple Silicon (MPS) — SVD video generation: `RuntimeError: Invalid buffer size`
+
+> **Status: open — not yet resolved. Planned for a future release.**
+
+**Affected command:**
+```bash
+bn-run-scribe-video -c config.yml --num-frames 14 --fps 5 --decode-chunk-size 1 --no-llama
+```
+
+**Symptom:** Generation fails at the first SVD denoising step with:
+```
+RuntimeError - Invalid buffer size: 22.15 GB
+```
+The error size doubles to `44.30 GB` if the SVD model is loaded in `float32`.
+
+**Investigated and ruled out:**
+
+- Reducing `--num-frames` to 14 and `--decode-chunk-size` to 1 — no effect on the buffer error.
+- Reducing the SVD input resolution to 256×144 without passing `height`/`width` to the pipeline — no effect; the pipeline was silently running at its default 1024×576, not the resized image size.
+- Passing `height=144, width=256` explicitly to override the pipeline default — the `Invalid buffer size` error resolved but exposed a new UNet skip-connection mismatch (`Expected size 6 but got size 5`). The root cause: both image dimensions must be divisible by 64 (VAE scale 8 × UNet 3-stage scale 8) for skip connections to match. 144 fails this check — latent height 18 halves as 18→9→5→3; the decoder upsamples 3→6 but the encoder skip is 5. The resolution was changed to 320×192 (both divisible by 64), which resolved this secondary error.
+- Deleting the SD3 base model and forcing `gc.collect()` + `torch.mps.empty_cache()` before SVD loads — reduces peak MPS usage but does not affect SVD inference.
+- Loading SVD in `float32` instead of `float16` — the error doubled to `44.30 GB` proportionally, confirming the buffer size scales with dtype and is a real tensor allocation, not a spurious MPS error.
+- Dropping the SD3 T5-XXL text encoder on MPS (`text_encoder_3=None`) — resolved the SD3 loading issue independently but has no effect on SVD.
+
+**Likely root causes (under investigation):**
+
+1. **MPS per-buffer allocation ceiling** — PyTorch's MPS backend enforces a hard limit on the size of a single Metal buffer. On Apple Silicon, this ceiling is tied to the total unified memory of the device. SVD's UNet spatial self-attention at the first resolution level materialises a `[frames × heads, seq, seq]` matrix that appears to exceed this ceiling for the specific combination of frame count, spatial resolution, and attention head count in `stable-video-diffusion-img2vid-xt`.
+
+2. **No flash attention on MPS** — Unlike CUDA (which uses memory-efficient FlashAttention), MPS computes the full attention matrix in a single operation. There is currently no `xformers`-style memory-efficient attention backend available for MPS in PyTorch 2.4.x, and `enable_attention_slicing` does not reduce the allocation for all attention layer types in `UNetSpatioTemporalConditionModel`.
+
+3. **Possible diffusers 0.30.x incompatibility with MPS for spatiotemporal UNets** — `UNetSpatioTemporalConditionModel` (used exclusively by SVD) may have MPS-specific paths that do not respect attention slicing or that trigger large intermediate allocations not present on CUDA.
+
+---
+
 ## License
 
 MIT — see [LICENSE](LICENSE) for details.
