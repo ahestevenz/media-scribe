@@ -33,15 +33,15 @@ sd_config:
   model_paths:
     sd_3:
       - models--stabilityai--stable-diffusion-3-medium-diffusers/sd3_medium_incl_clips_t5xxlfp16.safetensors
-      - models--Stable-Diffusion-XL/sd_xl_refiner_1.0.safetensors
+      - models--stabilityai--stable-diffusion-xl-refiner-1.0/sd_xl_refiner_1.0.safetensors
 
     sd_xl:
       - models--Stable-Diffusion-XL/sd_xl_base_1.0.safetensors
-      - models--Stable-Diffusion-XL/sd_xl_refiner_1.0.safetensors
+      - models--stabilityai--stable-diffusion-xl-refiner-1.0/sd_xl_refiner_1.0.safetensors
 
     civitai:
       - models--civitai/juggernautXL_juggXIByRundiffusion.safetensors
-      - models--Stable-Diffusion-XL/sd_xl_refiner_1.0.safetensors
+      - models--stabilityai--stable-diffusion-xl-refiner-1.0/sd_xl_refiner_1.0.safetensors
 
     pix_2_pix:
       - models--timbrooks--instruct-pix2pix/snapshots/31519b5cb02a7fd89b906d88731cd4d6a7bbf88d
