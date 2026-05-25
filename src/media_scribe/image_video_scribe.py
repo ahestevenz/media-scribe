@@ -213,7 +213,8 @@ class ImageVideoScribe:
         else:
             self.svd_pipe = self.svd_pipe.to(self.device)
         self.svd_pipe.enable_attention_slicing(1)
-        self.svd_pipe.enable_vae_slicing()
+        if hasattr(self.svd_pipe, "enable_vae_slicing"):
+            self.svd_pipe.enable_vae_slicing()
         if self.svd_pipe is None:
             raise ValueError("svd_pipe cannot be None")
 
@@ -256,10 +257,15 @@ class ImageVideoScribe:
         anchor_image.save(anchor_path)
         logger.info(f"Anchor frame saved to {anchor_path}")
 
-        # Free the base model from device memory before loading SVD
+        # Free the base model from device memory before loading SVD.
+        # Suppress the float16-on-CPU warning — the model is only parked here,
+        # not used for inference on CPU.
         logger.info(
             "Offloading base model to CPU to free device memory for SVD...")
-        self.base_model_pipe.to("cpu")
+        import warnings
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message=".*float16.*cpu.*")
+            self.base_model_pipe.to("cpu")
         if self.device.type == "cuda":
             torch.cuda.empty_cache()
         elif self.device.type == "mps":
@@ -268,11 +274,13 @@ class ImageVideoScribe:
         if self.svd_pipe is None:
             self._load_svd_pipeline()
 
-        # SVD expects 1024×576; use 512×320 on MPS to reduce peak activation memory
+        # SVD expects 1024×576 (16:9).  At 512×320, peak MPS activation buffers
+        # exceed 36 GB on M-series unified memory.  384×216 keeps 16:9 and cuts
+        # spatial area by ~50 %, which brings peak usage comfortably under 24 GB.
         if self.device.type == "mps":
-            svd_image = anchor_image.resize((512, 320))
+            svd_image = anchor_image.resize((384, 216))
             logger.info(
-                "MPS device: resizing anchor to 512×320 to fit device memory")
+                "MPS device: resizing anchor to 384×216 to fit device memory")
         else:
             svd_image = anchor_image.resize((1024, 576))
 
