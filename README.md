@@ -73,10 +73,10 @@ The model is loaded by name at runtime via `transformers`; no path entry in `con
 
 ### 2. Stable Diffusion 3 Medium *(gated)*
 
-Request access at [stabilityai/stable-diffusion-3-medium-diffusers](https://huggingface.co/stabilityai/stable-diffusion-3-medium-diffusers), accept the licence, then:
+Request access at [stabilityai/stable-diffusion-3-medium](https://huggingface.co/stabilityai/stable-diffusion-3-medium), accept the licence, then:
 
 ```bash
-huggingface-cli download stabilityai/stable-diffusion-3-medium-diffusers \
+huggingface-cli download stabilityai/stable-diffusion-3-medium \
   sd3_medium_incl_clips_t5xxlfp16.safetensors \
   --local-dir ~/.cache/huggingface/hub/models--stabilityai--stable-diffusion-3-medium-diffusers
 ```
@@ -100,10 +100,10 @@ Used as the refiner for `sd_3`, `sd_xl`, and `civitai` model types.
 ```bash
 huggingface-cli download stabilityai/stable-diffusion-xl-refiner-1.0 \
   sd_xl_refiner_1.0.safetensors \
-  --local-dir ~/.cache/huggingface/hub/models--Stable-Diffusion-XL
+  --local-dir ~/.cache/huggingface/hub/models--stabilityai--stable-diffusion-xl-refiner-1.0
 ```
 
-Config path: `models--Stable-Diffusion-XL/sd_xl_refiner_1.0.safetensors`
+Config path: `models--stabilityai--stable-diffusion-xl-refiner-1.0/sd_xl_refiner_1.0.safetensors`
 
 ### 5. JuggernautXL by RunDiffusion *(CivitAI)*
 
@@ -179,7 +179,7 @@ sd_config:
   model_paths:
     sd_3:
       - models--stabilityai--stable-diffusion-3-medium-diffusers/sd3_medium_incl_clips_t5xxlfp16.safetensors
-      - models--Stable-Diffusion-XL/sd_xl_refiner_1.0.safetensors
+      - models--stabilityai--stable-diffusion-xl-refiner-1.0/sd_xl_refiner_1.0.safetensors
     sd_xl:
       - models--Stable-Diffusion-XL/sd_xl_base_1.0.safetensors
       - models--Stable-Diffusion-XL/sd_xl_refiner_1.0.safetensors
@@ -327,6 +327,61 @@ video_path = scribe.generate_video_svd(
     decode_chunk_size=4, # lower to reduce peak memory on MPS
 )
 ```
+
+---
+
+## Examples
+
+### Text generation
+
+```bash
+> bn-run-scribe-text -c config.yml
+2026-05-25 12:12:05.988 | INFO     | media_scribe.scripts.run_scribe_text:main:94 - Running without profiling
+Loading checkpoint shards: 100%|███████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 4/4 [00:12<00:00,  3.19s/it]
+2026-05-25 12:12:23.276 | INFO     | media_scribe.utils:start_text_interaction:49 - Welcome to the LLaMA 3 Interactive Text Generator!
+2026-05-25 12:12:23.276 | INFO     | media_scribe.utils:start_text_interaction:50 - Type 'exit' to quit the program and use the last LLaMA response as the prompt.
+
+You:
+ Write a short story featuring a shark and a whale as the main characters.
+LLaMA:
+ Here is a short story featuring a shark and a whale as the main characters:
+
+---
+
+The ocean was a vast and mysterious place, full of wonders and dangers. But for Finley the shark and Wally the whale, it was home.
+
+Finley was a curious and adventurous shark, always looking for the next big thrill. He loved to explore the depths of the ocean, discovering hidden caves and shipwrecks. But despite his bravery, Finley had a secret: he was terrified of the dark.
+
+Wally, on the other hand, was a gentle giant. He was a humpback whale, with a heart as big as the sea itself. Wally loved to sing, and his deep, rumbling voice could be heard for miles. He was a natural performer, and his concerts drew in all sorts of sea creatures from far and wide.
+
+One day, Finley and Wally met on the ocean floor. Finley was exploring a shipwreck, and Wally was singing a solo in the nearby kelp forest. They locked eyes, and Finley felt a spark of recognition. He had never seen a whale up close before, and Wally had never seen a shark that wasn't trying to eat him.
+
+The two became fast friends,
+You:
+```
+
+### Image generation
+
+```bash
+> bn-run-scribe-image -c config.yml
+2026-05-25 12:00:22.918 | INFO     | media_scribe.scripts.run_scribe_image:main:145 - Running without profiling
+Loading checkpoint shards: 100%|███████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 4/4 [00:15<00:00,  3.99s/it]
+2026-05-25 12:00:44.902 | INFO     | media_scribe.utils:start_text_interaction:35 - Introduce your prompt to generate the image:
+You:
+ Generate an image showing a sunset between mountain peaks
+Do you want to improve the prompt? (yes/no): no
+2026-05-25 12:02:34.368 | INFO     | media_scribe.utils:start_text_interaction:45 - Returning the original prompt...
+2026-05-25 12:02:34.368 | INFO     | media_scribe.scripts.run_scribe_image:_main:48 - Enter a negative prompt for image generation (leave blank if none):
+Negative Prompt:
+
+Fetching 21 files: 100%|███████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 21/21 [00:00<00:00, 8786.95it/s]
+Loading pipeline components...: 100%|██████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 9/9 [00:05<00:00,  1.52it/s]
+Fetching 10 files: 100%|███████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 10/10 [00:00<00:00, 4094.80it/s]
+Loading pipeline components...: 100%|██████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 5/5 [00:01<00:00,  4.28it/s]
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 50/50 [02:21<00:00,  2.83s/it]
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 15/15 [00:31<00:00,  2.09s/it]
+```
+![Generated image example](assets/refined_generated_image.png)
 
 ---
 
