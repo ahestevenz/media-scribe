@@ -63,9 +63,16 @@ class ImageVideoScribe:
                     torch_dtype=torch.float16,
                 ).to(self.device)
             case ModelImageType.SD_3:
+                sd3_kwargs: dict = {"torch_dtype": torch.float16}
+                if self.device.type == "mps":
+                    # T5-XXL is ~39 GB at fp16 — exceeds the MPS single-buffer
+                    # limit on Apple Silicon. Drop it; the two CLIP encoders
+                    # still produce high-quality results.
+                    sd3_kwargs["text_encoder_3"] = None
+                    sd3_kwargs["tokenizer_3"] = None
                 self.base_model_pipe = StableDiffusion3Pipeline.from_single_file(
                     base_model_path.as_posix(),
-                    torch_dtype=torch.float16,
+                    **sd3_kwargs,
                 ).to(self.device)
             case ModelImageType.PIX_2_PIX:
                 self.base_model_pipe = (
@@ -278,15 +285,21 @@ class ImageVideoScribe:
         # exceed 36 GB on M-series unified memory.  384×216 keeps 16:9 and cuts
         # spatial area by ~50 %, which brings peak usage comfortably under 24 GB.
         if self.device.type == "mps":
-            svd_image = anchor_image.resize((384, 216))
+            decode_chunk_size = 1  # override caller's value
             logger.info(
-                "MPS device: resizing anchor to 384×216 to fit device memory")
+                "MPS device: forcing decode_chunk_size=1 to reduce peak memory")
+            svd_image = anchor_image.resize((256, 144))
+            logger.info(
+                "MPS device: resizing anchor to (256, 144) to fit device memory")
+            torch.mps.empty_cache()
         else:
             svd_image = anchor_image.resize((1024, 576))
 
         logger.info(f"Generating {num_frames} video frames with SVD...")
+
         if self.svd_pipe is None:
             raise ValueError("self.svd_pipe failed to initialize")
+
         frames: list[Image.Image] = self.svd_pipe(
             svd_image,
             num_frames=num_frames,
