@@ -20,6 +20,8 @@ from transformers import CLIPTokenizer
 
 from media_scribe.media_scribe_config import MediaScribeConfig, ModelImageType
 
+SVD_HF_ID: str = "stabilityai/stable-video-diffusion-img2vid-xt"
+
 
 class ImageVideoScribe:
     def __init__(self, config: MediaScribeConfig):
@@ -207,8 +209,7 @@ class ImageVideoScribe:
         return image_path
 
     def _load_svd_pipeline(self) -> None:
-        _SVD_HF_ID = "stabilityai/stable-video-diffusion-img2vid-xt"
-        svd_source = self.config.sd_config.svd_model_path or _SVD_HF_ID
+        svd_source = self.config.sd_config.svd_model_path or SVD_HF_ID
         logger.info(f"Loading SVD pipeline from {svd_source}")
         self.svd_pipe = StableVideoDiffusionPipeline.from_pretrained(
             svd_source,
@@ -219,7 +220,8 @@ class ImageVideoScribe:
             self.svd_pipe.enable_model_cpu_offload()
         else:
             self.svd_pipe = self.svd_pipe.to(self.device)
-        self.svd_pipe.enable_attention_slicing(1)
+
+        self.svd_pipe.enable_attention_slicing()
         if hasattr(self.svd_pipe, "enable_vae_slicing"):
             self.svd_pipe.enable_vae_slicing()
         if self.svd_pipe is None:
@@ -264,19 +266,22 @@ class ImageVideoScribe:
         anchor_image.save(anchor_path)
         logger.info(f"Anchor frame saved to {anchor_path}")
 
-        # Free the base model from device memory before loading SVD.
-        # Suppress the float16-on-CPU warning — the model is only parked here,
-        # not used for inference on CPU.
-        logger.info(
-            "Offloading base model to CPU to free device memory for SVD...")
+        # Free the base model before loading SVD.
+        logger.info("Freeing base model memory before loading SVD...")
+        import gc
         import warnings
-        with warnings.catch_warnings():
-            warnings.filterwarnings("ignore", message=".*float16.*cpu.*")
-            self.base_model_pipe.to("cpu")
-        if self.device.type == "cuda":
-            torch.cuda.empty_cache()
-        elif self.device.type == "mps":
+        if self.device.type == "mps":
+            # .to("cpu") does not release MPS allocations; deleting the
+            # pipeline and forcing GC is the only reliable way to free the pool.
+            del self.base_model_pipe
+            gc.collect()
             torch.mps.empty_cache()
+        else:
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", message=".*float16.*cpu.*")
+                self.base_model_pipe.to("cpu")
+            if self.device.type == "cuda":
+                torch.cuda.empty_cache()
 
         if self.svd_pipe is None:
             self._load_svd_pipeline()

@@ -11,7 +11,7 @@ llama_config:
 
 sd_config:
   root_models_path: ~/.cache/huggingface/hub
-  root_output_dir: ~/Desktop/hola
+  root_output_dir: ~/Desktop/media-scrive-outputs
   model_type: "sd_3"
   model_paths:
     sd_3:
