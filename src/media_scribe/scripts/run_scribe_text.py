@@ -79,19 +79,24 @@ def main():
 
     utils.setup_ctrl_q_handler()
 
-    if args["profile"] is not None:
-        logger.info("Start profiling")
-        r = 1
-        profile.runctx(
-            "r = _main(args)",
-            globals(),
-            locals(),
-            filename=args["profile"],
-        )
-        logger.info("Done profiling")
-    else:
-        logger.info("Running without profiling")
-        r = _main(args)
+    try:
+        if args["profile"] is not None:
+            logger.info("Start profiling")
+            r = 1
+            profile.runctx(
+                "r = _main(args)",
+                globals(),
+                locals(),
+                filename=args["profile"],
+            )
+            logger.info("Done profiling")
+        else:
+            logger.info("Running without profiling")
+            r = _main(args)
+    except KeyboardInterrupt:
+        logger.info("Interrupted by user. Exiting.")
+        return 0
+
     return r
 
 

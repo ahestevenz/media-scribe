@@ -48,6 +48,10 @@ class ImageVideoScribe:
         return directory
 
     def _load_model_pipelines(self) -> None:
+        base_model_path = self.config.sd_config.base_model_path
+        if base_model_path is None:
+            raise ValueError("base_model_path must be set")
+
         match self.config.sd_config.model_type:
             case (
                 ModelImageType.CIVITAI
@@ -55,25 +59,25 @@ class ImageVideoScribe:
                 | ModelImageType.SD_XL
             ):
                 self.base_model_pipe = StableDiffusionXLPipeline.from_single_file(
-                    self.config.sd_config.base_model_path,
+                    base_model_path.as_posix(),
                     torch_dtype=torch.float16,
                 ).to(self.device)
             case ModelImageType.SD_3:
                 self.base_model_pipe = StableDiffusion3Pipeline.from_single_file(
-                    self.config.sd_config.base_model_path,
+                    base_model_path.as_posix(),
                     torch_dtype=torch.float16,
                 ).to(self.device)
             case ModelImageType.PIX_2_PIX:
                 self.base_model_pipe = (
                     StableDiffusionInstructPix2PixPipeline.from_pretrained(
-                        self.config.sd_config.base_model_path,
+                        base_model_path.as_posix(),
                         torch_dtype=torch.float16,
                     ).to(self.device)
                 )
                 self.load_img2img = True
             case ModelImageType.SD_1_5_IMG_2_IMG:
                 self.base_model_pipe = StableDiffusionImg2ImgPipeline.from_pretrained(
-                    self.config.sd_config.base_model_path,
+                    base_model_path.as_posix(),
                     torch_dtype=torch.float16,
                 ).to(self.device)
                 self.load_img2img = True
@@ -81,8 +85,11 @@ class ImageVideoScribe:
                 raise NotImplementedError("Method does not exist!")
 
         if self.load_refiner and not self.load_img2img:
+            refiner_model_path = self.config.sd_config.refiner_model_path
+            if refiner_model_path is None:
+                raise ValueError("refiner_model_path must be set")
             self.refiner_model_pipe = StableDiffusionXLImg2ImgPipeline.from_single_file(
-                self.config.sd_config.refiner_model_path,
+                refiner_model_path.as_posix(),
                 torch_dtype=torch.float16,
             ).to(self.device)
 
@@ -207,6 +214,8 @@ class ImageVideoScribe:
             self.svd_pipe = self.svd_pipe.to(self.device)
         self.svd_pipe.enable_attention_slicing(1)
         self.svd_pipe.enable_vae_slicing()
+        if self.svd_pipe is None:
+            raise ValueError("svd_pipe cannot be None")
 
     def generate_video_svd(
         self,
@@ -258,7 +267,6 @@ class ImageVideoScribe:
 
         if self.svd_pipe is None:
             self._load_svd_pipeline()
-        assert self.svd_pipe is not None
 
         # SVD expects 1024×576; use 512×320 on MPS to reduce peak activation memory
         if self.device.type == "mps":
@@ -269,6 +277,8 @@ class ImageVideoScribe:
             svd_image = anchor_image.resize((1024, 576))
 
         logger.info(f"Generating {num_frames} video frames with SVD...")
+        if self.svd_pipe is None:
+            raise ValueError("self.svd_pipe failed to initialize")
         frames: list[Image.Image] = self.svd_pipe(
             svd_image,
             num_frames=num_frames,
